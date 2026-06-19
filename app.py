@@ -23,10 +23,10 @@ HTML = r"""<!DOCTYPE html>
 <title>Employee Tracker</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#f5f4f0;--surface:#fff;--surface2:#f0efe9;--border:#e2e0d8;--border2:#cccac0;--text:#1a1916;--text2:#6b6860;--text3:#9e9c96;--accent:#1a6b4a;--accent-bg:#e8f4ee;--amber:#92500a;--amber-bg:#fdf0e0;--red:#8b2020;--red-bg:#fdeaea;--blue:#1a4a7a;--blue-bg:#e8f0fa;--radius:8px;--radius-lg:12px;--font:'IBM Plex Sans',sans-serif;--mono:'IBM Plex Mono',monospace}
+:root{--bg:#f5f4f0;--surface:#fff;--surface2:#f0efe9;--border:#e2e0d8;--border2:#cccac0;--text:#1a1916;--text2:#6b6860;--text3:#9e9c96;--accent:#1a6b4a;--accent-bg:#e8f4ee;--amber:#92500a;--amber-bg:#fdf0e0;--red:#8b2020;--red-bg:#fdeaea;--blue:#1a4a7a;--blue-bg:#e8f0fa;--purple:#5b3a8e;--purple-bg:#f0eaf9;--radius:8px;--radius-lg:12px;--font:'IBM Plex Sans',sans-serif;--mono:'IBM Plex Mono',monospace}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
-.app{max-width:1500px;margin:0 auto;padding:2rem 1.5rem}
+.app{max-width:1550px;margin:0 auto;padding:2rem 1.5rem}
 .header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:2rem;flex-wrap:wrap;gap:1rem}
 .header-left h1{font-size:22px;font-weight:600;letter-spacing:-.3px}
 .header-left p{font-size:13px;color:var(--text2);margin-top:3px}
@@ -48,8 +48,9 @@ select.filter{font-size:13px;font-family:var(--font);padding:8px 12px;border:1px
 .btn-primary{background:var(--text);color:var(--bg);border-color:var(--text)}
 .btn-primary:hover{opacity:.85;background:var(--text)}
 .btn-icon{padding:5px;width:28px;height:28px;justify-content:center;font-size:14px}
+.btn-xs{padding:4px 10px;font-size:11px}
 .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:1200px}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:1250px}
 thead th{background:var(--surface2);padding:10px 12px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
 thead th:hover{color:var(--text)}
 tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
@@ -70,10 +71,10 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
 .state-box .sub{font-size:12px;color:var(--text3);margin-top:6px}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center;padding:1rem}
 .overlay.open{display:flex}
-.modal{background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:1.75rem;width:100%;max-width:560px;max-height:92vh;overflow-y:auto}
+.modal{background:var(--surface);border-radius:var(--radius-lg);border:1px solid var(--border);padding:1.75rem;width:100%;max-width:580px;max-height:92vh;overflow-y:auto}
 .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem}
 .modal-header h2{font-size:16px;font-weight:600}
-.section-sep{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:1.25rem 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.section-sep{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:1.25rem 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .fg{display:flex;flex-direction:column;gap:4px}
 .fg.full{grid-column:1/-1}
@@ -89,18 +90,22 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
 .hl-green{background:var(--accent-bg)}
 .hl-amber{background:var(--amber-bg)}
 .hl-red{background:var(--red-bg)}
+.hl-purple{background:var(--purple-bg)}
 .hl-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
 .hl-green .hl-label{color:var(--accent)}
 .hl-amber .hl-label{color:var(--amber)}
 .hl-red .hl-label{color:var(--red)}
+.hl-purple .hl-label{color:var(--purple)}
 .hl-value{font-size:14px;font-weight:600}
 .hl-green .hl-value{color:#0f4a30}
 .hl-amber .hl-value{color:#5a3000}
 .hl-red .hl-value{color:var(--red)}
+.hl-purple .hl-value{color:var(--purple)}
 .hl-sub{font-size:12px;margin-top:3px}
 .hl-green .hl-sub{color:var(--accent)}
 .hl-amber .hl-sub{color:var(--amber)}
 .hl-red .hl-sub{color:var(--red)}
+.hl-purple .hl-sub{color:var(--purple)}
 .d-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:10px}
 .d-cell{background:var(--surface);padding:10px 12px}
 .d-cell-lbl{font-size:10px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
@@ -109,6 +114,13 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
 .toast.show{opacity:1;transform:translateY(0)}
 .toast.error{background:var(--red)}
 .sync-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;background:var(--accent)}
+.history-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.history-row{display:flex;align-items:center;justify-content:space-between;background:var(--surface2);border-radius:var(--radius);padding:8px 12px;font-size:12px}
+.history-row .h-main{font-weight:500}
+.history-row .h-sub{color:var(--text2);font-size:11px}
+.history-empty{font-size:12px;color:var(--text3);padding:8px 0}
+.salary-add-row{display:flex;gap:8px;align-items:flex-end;margin-top:8px}
+.salary-add-row .fg{flex:1}
 @media(max-width:600px){.form-grid{grid-template-columns:1fr}.fg.full{grid-column:1}.app{padding:1rem}}
 </style>
 </head>
@@ -161,6 +173,7 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
           <th>Employer</th>
           <th onclick="sortBy('idExpiry')">ID expiry &#8597;</th>
           <th>ID status</th>
+          <th onclick="sortBy('currentSalary')">Salary &#8597;</th>
           <th onclick="sortBy('nextVacStart')">Next vacation &#8597;</th>
           <th>Vac. status</th>
           <th onclick="sortBy('loanRemaining')">Loan remaining &#8597;</th>
@@ -190,6 +203,7 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
       <div class="fg"><label>Employer name</label><input id="f_employerName" placeholder="e.g. Al-Rashidi Trading Co."></div>
       <div class="fg"><label>Employer ID</label><input id="f_employerId" placeholder="e.g. CR-1234567890"></div>
     </div>
+
     <div class="section-sep">Vacation</div>
     <div class="form-grid">
       <div class="fg"><label>Last vacation start</label><input type="date" id="f_lv_start"></div>
@@ -197,12 +211,31 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
       <div class="fg"><label>Next vacation start</label><input type="date" id="f_nv_start"></div>
       <div class="fg"><label>Next vacation end</label><input type="date" id="f_nv_end"></div>
     </div>
+    <div id="vacHistorySection" style="display:none">
+      <div class="section-sep" style="margin-top:14px">Vacation history</div>
+      <div class="history-list" id="vacHistoryList"></div>
+    </div>
+
     <div class="section-sep">Loan</div>
     <div class="form-grid">
       <div class="fg"><label>Loan amount (SAR)</label><input type="number" id="f_loan" placeholder="0 = no loan" min="0"></div>
       <div class="fg"><label>Loan remaining (SAR)</label><input type="number" id="f_loan_rem" placeholder="0" min="0"></div>
       <div class="fg full"><label>Monthly payment (SAR)</label><input type="number" id="f_loan_pay" placeholder="0" min="0"></div>
     </div>
+
+    <div class="section-sep">Salary</div>
+    <div class="form-grid">
+      <div class="fg full"><label>Current salary (SAR)</label><input type="number" id="f_salary" placeholder="0" min="0"></div>
+    </div>
+    <div id="salaryHistorySection" style="display:none">
+      <div class="history-list" id="salaryHistoryList"></div>
+    </div>
+    <div class="salary-add-row">
+      <div class="fg"><label>Add salary change date</label><input type="date" id="f_salaryChangeDate"></div>
+      <div class="fg"><label>New amount (SAR)</label><input type="number" id="f_salaryChangeAmount" placeholder="0" min="0"></div>
+      <button class="btn btn-xs" onclick="addSalaryHistoryEntry()">+ Add</button>
+    </div>
+
     <div class="modal-actions">
       <button class="btn" onclick="closeModal()">Cancel</button>
       <button class="btn btn-primary" id="saveBtn" onclick="saveEmployee()">Save employee</button>
@@ -211,7 +244,7 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
 </div>
 
 <div class="overlay" id="detailModal">
-  <div class="modal" style="max-width:500px">
+  <div class="modal" style="max-width:520px">
     <div class="modal-header">
       <h2>Employee details</h2>
       <button class="btn btn-icon" onclick="closeDetail()">&#10005;</button>
@@ -228,6 +261,8 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
 <script>
 const TODAY=new Date();TODAY.setHours(0,0,0,0);
 let employees=[],sortField='name',sortDir=1,editIdx=null;
+let currentVacHistory=[],currentSalaryHistory=[];
+
 function dFmt(d){if(!d)return'—';const p=d.split('-');return`${p[2]}/${p[1]}/${p[0]}`}
 function daysDiff(d){if(!d)return null;const dt=new Date(d);dt.setHours(0,0,0,0);return Math.round((dt-TODAY)/86400000)}
 function yearsFrom(d){if(!d)return null;return((TODAY-new Date(d))/31557600000).toFixed(1)}
@@ -281,9 +316,9 @@ function renderTable(){
   if(fi==='expired')rows=rows.filter(e=>e.idExpiry&&daysDiff(e.idExpiry)<0);
   if(fi==='soon')rows=rows.filter(e=>{const ds=daysDiff(e.idExpiry);return ds>=0&&ds<=60});
   if(fi==='ok')rows=rows.filter(e=>e.idExpiry&&daysDiff(e.idExpiry)>60);
-  rows.sort((a,b)=>{let av=a[sortField]||'',bv=b[sortField]||'';if(['loanAmount','loanRemaining','loanMonthly'].includes(sortField)){av=Number(av);bv=Number(bv)}return av>bv?sortDir:av<bv?-sortDir:0});
+  rows.sort((a,b)=>{let av=a[sortField]||'',bv=b[sortField]||'';if(['loanAmount','loanRemaining','loanMonthly','currentSalary'].includes(sortField)){av=Number(av);bv=Number(bv)}return av>bv?sortDir:av<bv?-sortDir:0});
   const tbody=document.getElementById('tableBody');
-  if(!rows.length){tbody.innerHTML=`<tr><td colspan="14"><div class="state-box"><p>&#128100; No employees found</p><p class="sub">Add your first employee using the button above</p></div></td></tr>`;renderStats();return}
+  if(!rows.length){tbody.innerHTML=`<tr><td colspan="15"><div class="state-box"><p>&#128100; No employees found</p><p class="sub">Add your first employee using the button above</p></div></td></tr>`;renderStats();return}
   tbody.innerHTML=rows.map((e,i)=>{
     const vs=vacStatus(e),ls=loanStatus(e),is=idStatus(e),oi=employees.indexOf(e),yr=yearsFrom(e.joiningDate);
     return`<tr>
@@ -296,6 +331,7 @@ function renderTable(){
       <td><div style="font-size:12px;font-weight:500">${e.employerName||'—'}</div><div class="td-mono" style="font-size:10px;margin-top:1px">${e.employerId||''}</div></td>
       <td style="font-size:12px">${dFmt(e.idExpiry)}</td>
       <td><span class="badge ${is.cls}">${is.label}</span></td>
+      <td style="font-size:12px;font-weight:500">${e.currentSalary?fmtSAR(e.currentSalary):'—'}</td>
       <td style="font-size:11px">${e.nextVacStart?dFmt(e.nextVacStart)+(e.nextVacEnd?' – '+dFmt(e.nextVacEnd):''):'—'}</td>
       <td><span class="badge ${vs.cls}">${vs.label}</span></td>
       <td style="font-size:12px">${e.loanRemaining>0?fmtSAR(e.loanRemaining):'—'}</td>
@@ -315,6 +351,7 @@ function renderStats(){
   const upcoming=employees.filter(e=>{const ds=daysDiff(e.nextVacStart);return ds>0&&ds<=30}).length;
   const withLoan=employees.filter(e=>e.loanAmount>0&&e.loanRemaining>0).length;
   const totalLoan=employees.reduce((s,e)=>s+(Number(e.loanRemaining)||0),0);
+  const totalSalary=employees.reduce((s,e)=>s+(Number(e.currentSalary)||0),0);
   const expiredId=employees.filter(e=>e.idExpiry&&daysDiff(e.idExpiry)<0).length;
   const expiringId=employees.filter(e=>{const ds=daysDiff(e.idExpiry);return ds>=0&&ds<=60}).length;
   document.getElementById('statsRow').innerHTML=`
@@ -323,15 +360,35 @@ function renderStats(){
     <div class="stat-card"><div class="lbl">Vacation in 30d</div><div class="val">${upcoming}</div></div>
     <div class="stat-card"><div class="lbl">Active loans</div><div class="val">${withLoan}</div></div>
     <div class="stat-card"><div class="lbl">Total loan left</div><div class="val sm">SAR ${totalLoan.toLocaleString()}</div></div>
+    <div class="stat-card"><div class="lbl">Total monthly payroll</div><div class="val sm">SAR ${totalSalary.toLocaleString()}</div></div>
     <div class="stat-card" style="${expiredId>0?'border-color:var(--red);background:var(--red-bg)':''}"><div class="lbl">ID expired</div><div class="val" style="${expiredId>0?'color:var(--red)':''}">${expiredId}</div></div>
     <div class="stat-card" style="${expiringId>0?'border-color:var(--amber);background:var(--amber-bg)':''}"><div class="lbl">ID expiring 60d</div><div class="val" style="${expiringId>0?'color:var(--amber)':''}">${expiringId}</div></div>
   `;
 }
 
-function openAdd(){editIdx=null;clearForm();document.getElementById('formModalTitle').textContent='Add employee';document.getElementById('saveBtn').textContent='Save employee';document.getElementById('formModal').classList.add('open')}
-function openEdit(i){editIdx=i;fillForm(employees[i]);document.getElementById('formModalTitle').textContent='Edit employee';document.getElementById('saveBtn').textContent='Update employee';document.getElementById('formModal').classList.add('open')}
+function openAdd(){
+  editIdx=null;clearForm();
+  currentVacHistory=[];currentSalaryHistory=[];
+  document.getElementById('vacHistorySection').style.display='none';
+  document.getElementById('salaryHistorySection').style.display='none';
+  document.getElementById('formModalTitle').textContent='Add employee';
+  document.getElementById('saveBtn').textContent='Save employee';
+  document.getElementById('formModal').classList.add('open');
+}
+function openEdit(i){
+  editIdx=i;
+  const e=employees[i];
+  fillForm(e);
+  currentVacHistory=Array.isArray(e.vacHistory)?[...e.vacHistory]:[];
+  currentSalaryHistory=Array.isArray(e.salaryHistory)?[...e.salaryHistory]:[];
+  renderVacHistory();
+  renderSalaryHistory();
+  document.getElementById('formModalTitle').textContent='Edit employee';
+  document.getElementById('saveBtn').textContent='Update employee';
+  document.getElementById('formModal').classList.add('open');
+}
 function closeModal(){document.getElementById('formModal').classList.remove('open')}
-function clearForm(){['f_name','f_empId','f_phone','f_borderNo','f_idExpiry','f_joiningDate','f_employerName','f_employerId','f_lv_start','f_lv_end','f_nv_start','f_nv_end','f_loan','f_loan_rem','f_loan_pay'].forEach(id=>document.getElementById(id).value='')}
+function clearForm(){['f_name','f_empId','f_phone','f_borderNo','f_idExpiry','f_joiningDate','f_employerName','f_employerId','f_lv_start','f_lv_end','f_nv_start','f_nv_end','f_loan','f_loan_rem','f_loan_pay','f_salary','f_salaryChangeDate','f_salaryChangeAmount'].forEach(id=>document.getElementById(id).value='')}
 function fillForm(e){
   document.getElementById('f_name').value=e.name||'';
   document.getElementById('f_empId').value=e.empId||'';
@@ -348,9 +405,63 @@ function fillForm(e){
   document.getElementById('f_loan').value=e.loanAmount||'';
   document.getElementById('f_loan_rem').value=e.loanRemaining||'';
   document.getElementById('f_loan_pay').value=e.loanMonthly||'';
+  document.getElementById('f_salary').value=e.currentSalary||'';
 }
 
+function renderVacHistory(){
+  const sec=document.getElementById('vacHistorySection');
+  const list=document.getElementById('vacHistoryList');
+  if(!currentVacHistory.length){sec.style.display='none';return}
+  sec.style.display='block';
+  list.innerHTML=currentVacHistory.slice().reverse().map((v,ri)=>{
+    const i=currentVacHistory.length-1-ri;
+    return`<div class="history-row"><div><div class="h-main">${dFmt(v.start)} – ${dFmt(v.end)}</div></div><button class="btn btn-icon btn-xs" onclick="removeVacHistory(${i})">&#10005;</button></div>`;
+  }).join('');
+}
+function removeVacHistory(i){currentVacHistory.splice(i,1);renderVacHistory()}
+
+function renderSalaryHistory(){
+  const sec=document.getElementById('salaryHistorySection');
+  const list=document.getElementById('salaryHistoryList');
+  if(!currentSalaryHistory.length){sec.style.display='none';return}
+  sec.style.display='block';
+  const sorted=currentSalaryHistory.map((s,i)=>({...s,_i:i})).sort((a,b)=>new Date(b.date)-new Date(a.date));
+  list.innerHTML=sorted.map(s=>`<div class="history-row"><div><div class="h-main">${fmtSAR(s.amount)}</div><div class="h-sub">${dFmt(s.date)}</div></div><button class="btn btn-icon btn-xs" onclick="removeSalaryHistory(${s._i})">&#10005;</button></div>`).join('');
+}
+function addSalaryHistoryEntry(){
+  const date=document.getElementById('f_salaryChangeDate').value;
+  const amount=Number(document.getElementById('f_salaryChangeAmount').value);
+  if(!date||!amount){showToast('Enter both date and amount for salary history',true);return}
+  currentSalaryHistory.push({date,amount});
+  document.getElementById('f_salaryChangeDate').value='';
+  document.getElementById('f_salaryChangeAmount').value='';
+  renderSalaryHistory();
+}
+function removeSalaryHistory(i){currentSalaryHistory.splice(i,1);renderSalaryHistory()}
+
 async function saveEmployee(){
+  const newLvStart=document.getElementById('f_lv_start').value;
+  const newLvEnd=document.getElementById('f_lv_end').value;
+
+  // Auto-track vacation history: if editing and lastVacStart changed, push old one into history
+  if(editIdx!==null){
+    const old=employees[editIdx];
+    if(old.lastVacStart && (old.lastVacStart!==newLvStart || old.lastVacEnd!==newLvEnd)){
+      const alreadyIn=currentVacHistory.some(v=>v.start===old.lastVacStart&&v.end===old.lastVacEnd);
+      if(!alreadyIn)currentVacHistory.push({start:old.lastVacStart,end:old.lastVacEnd});
+    }
+  }
+
+  const newSalary=Number(document.getElementById('f_salary').value)||0;
+  // Auto-track salary history: if editing and salary changed, push old into history
+  if(editIdx!==null){
+    const old=employees[editIdx];
+    if(old.currentSalary && old.currentSalary!==newSalary){
+      const alreadyIn=currentSalaryHistory.some(s=>s.amount===old.currentSalary && s.date===(old.salaryChangeDate||old.joiningDate));
+      if(!alreadyIn)currentSalaryHistory.push({date:old._lastSalaryDate||old.joiningDate||'',amount:old.currentSalary});
+    }
+  }
+
   const emp={
     name:document.getElementById('f_name').value.trim(),
     empId:document.getElementById('f_empId').value.trim(),
@@ -360,13 +471,17 @@ async function saveEmployee(){
     joiningDate:document.getElementById('f_joiningDate').value,
     employerName:document.getElementById('f_employerName').value.trim(),
     employerId:document.getElementById('f_employerId').value.trim(),
-    lastVacStart:document.getElementById('f_lv_start').value,
-    lastVacEnd:document.getElementById('f_lv_end').value,
+    lastVacStart:newLvStart,
+    lastVacEnd:newLvEnd,
     nextVacStart:document.getElementById('f_nv_start').value,
     nextVacEnd:document.getElementById('f_nv_end').value,
     loanAmount:Number(document.getElementById('f_loan').value)||0,
     loanRemaining:Number(document.getElementById('f_loan_rem').value)||0,
     loanMonthly:Number(document.getElementById('f_loan_pay').value)||0,
+    currentSalary:newSalary,
+    vacHistory:currentVacHistory,
+    salaryHistory:currentSalaryHistory,
+    _lastSalaryDate: new Date().toISOString().split('T')[0],
   };
   if(!emp.name||!emp.empId){showToast('Name and Employee ID are required.',true);return}
   const btn=document.getElementById('saveBtn');btn.textContent='Saving…';btn.disabled=true;
@@ -395,6 +510,18 @@ function openDetail(i){
   const idDs=daysDiff(e.idExpiry);
   const idHlClass=!e.idExpiry?'hl-green':idDs<0?'hl-red':idDs<=60?'hl-amber':'hl-green';
   const idHlText=!e.idExpiry?'No expiry date set':idDs<0?`Expired ${Math.abs(idDs)} days ago`:idDs<=60?`Expiring in ${idDs} days`:`Valid — expires ${dFmt(e.idExpiry)}`;
+
+  const vacHistory=Array.isArray(e.vacHistory)?e.vacHistory:[];
+  const vacHistoryHtml=vacHistory.length
+    ?vacHistory.slice().reverse().map(v=>`<div class="history-row"><div class="h-main">${dFmt(v.start)} – ${dFmt(v.end)}</div></div>`).join('')
+    :'<div class="history-empty">No past vacation history recorded yet.</div>';
+
+  const salaryHistory=Array.isArray(e.salaryHistory)?e.salaryHistory:[];
+  const salaryHistorySorted=salaryHistory.slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const salaryHistoryHtml=salaryHistorySorted.length
+    ?salaryHistorySorted.map(s=>`<div class="history-row"><div class="h-main">${fmtSAR(s.amount)}</div><div class="h-sub">${dFmt(s.date)}</div></div>`).join('')
+    :'<div class="history-empty">No salary change history recorded yet.</div>';
+
   document.getElementById('detailContent').innerHTML=`
     <div class="d-header">
       <div class="avatar">${initials(e.name)}</div>
@@ -408,16 +535,28 @@ function openDetail(i){
       <div class="d-cell"><div class="d-cell-lbl">Employer ID</div><div class="d-cell-val" style="font-family:var(--mono);font-size:12px">${e.employerId||'—'}</div></div>
       <div class="d-cell"><div class="d-cell-lbl">ID status</div><div class="d-cell-val"><span class="badge ${is.cls}">${is.label}</span></div></div>
     </div>
+
     <div class="hl ${idHlClass}">
       <div class="hl-label">&#128196; ID / Iqama expiry</div>
       <div class="hl-value">${dFmt(e.idExpiry)}</div>
       <div class="hl-sub">${idHlText}</div>
     </div>
+
+    <div class="hl hl-purple">
+      <div class="hl-label">&#128176; Current salary</div>
+      <div class="hl-value">${e.currentSalary?fmtSAR(e.currentSalary):'Not set'}</div>
+    </div>
+    <div class="section-sep" style="margin-top:14px">Salary history</div>
+    <div class="history-list">${salaryHistoryHtml}</div>
+
     <div class="hl hl-green">
       <div class="hl-label">&#127958; Vacation</div>
       <div class="hl-value">${nv}</div>
       <div class="hl-sub">${nd?nd+' · ':''} Last: ${lv}</div>
     </div>
+    <div class="section-sep" style="margin-top:14px">Vacation history</div>
+    <div class="history-list">${vacHistoryHtml}</div>
+
     ${e.loanAmount>0?`<div class="hl hl-amber">
       <div class="hl-label">&#128181; Loan</div>
       <div class="hl-value">${fmtSAR(e.loanRemaining||0)} remaining</div>
