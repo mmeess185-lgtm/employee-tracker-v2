@@ -2,18 +2,31 @@ import json
 import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
+from pymongo import MongoClient
+from bson import ObjectId
 
-DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'employees.json')
+MONGO_URI = os.environ.get('MONGO_URI', 'mongodb+srv://admin111:Aa123456@cluster0.mv9vzv4.mongodb.net/?appName=Cluster0')
+client = MongoClient(MONGO_URI)
+db = client['employee_tracker']
+collection = db['employees']
 
 def load_employees():
-    if not os.path.exists(DATA_FILE):
-        return []
-    with open(DATA_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    docs = list(collection.find())
+    result = []
+    for d in docs:
+        d['_id'] = str(d['_id'])
+        result.append(d)
+    return result
 
-def save_employees(data):
-    with open(DATA_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+def add_employee(emp):
+    collection.insert_one(emp)
+
+def update_employee(doc_id, emp):
+    emp.pop('_id', None)
+    collection.update_one({'_id': ObjectId(doc_id)}, {'$set': emp})
+
+def delete_employee(doc_id):
+    collection.delete_one({'_id': ObjectId(doc_id)})
 
 HTML = r"""<!DOCTYPE html>
 <html lang="en">
@@ -122,6 +135,26 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
 .salary-add-row{display:flex;gap:8px;align-items:flex-end;margin-top:8px}
 .salary-add-row .fg{flex:1}
 @media(max-width:600px){.form-grid{grid-template-columns:1fr}.fg.full{grid-column:1}.app{padding:1rem}}
+.report-section{margin-bottom:18px}
+.report-section h3{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid var(--border)}
+.report-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
+.report-field{font-size:12px}
+.report-field .rf-lbl{color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+.report-field .rf-val{font-weight:500;color:var(--text)}
+.report-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+.report-table th{background:var(--surface2);padding:6px 10px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border)}
+.report-table td{padding:6px 10px;border-bottom:1px solid var(--border)}
+.report-header{text-align:center;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid var(--text)}
+.report-header h1{font-size:18px;font-weight:600}
+.report-header p{font-size:12px;color:var(--text2);margin-top:4px}
+@media print{
+  body *{visibility:hidden}
+  #reportPrintArea, #reportPrintArea *{visibility:visible}
+  #reportPrintArea{position:absolute;left:0;top:0;width:100%;padding:20px}
+  .overlay{position:static!important;background:none!important}
+  .modal{box-shadow:none!important;border:none!important;max-width:100%!important;max-height:none!important}
+  .modal-header{display:none!important}
+}
 </style>
 </head>
 <body>
@@ -129,7 +162,7 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
   <div class="header">
     <div class="header-left">
       <h1>&#128101; Employee Tracker</h1>
-      <p><span class="sync-dot"></span>Data saved on server</p>
+      <p><span class="sync-dot"></span>Data saved in cloud database</p>
     </div>
     <div class="header-right">
       <button class="btn" onclick="loadData()">&#8635; Refresh</button>
@@ -252,7 +285,21 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
     <div id="detailContent"></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeDetail()">Close</button>
+      <button class="btn btn-primary" onclick="openReportFromDetail()">&#128203; Full report</button>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="reportModal">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">
+      <h2>Employee Report</h2>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="printReport()">&#128424; Download / Print PDF</button>
+        <button class="btn btn-icon" onclick="closeReport()">&#10005;</button>
+      </div>
+    </div>
+    <div id="reportContent"></div>
   </div>
 </div>
 
@@ -338,6 +385,7 @@ function renderTable(){
       <td><span class="badge ${ls.cls}">${ls.label}</span></td>
       <td><div class="row-actions">
         <button class="btn btn-icon" onclick="openDetail(${oi})">&#128065;</button>
+        <button class="btn btn-icon" onclick="openReport(${oi})" title="Full report">&#128203;</button>
         <button class="btn btn-icon" onclick="openEdit(${oi})">&#9998;</button>
         <button class="btn btn-icon" onclick="deleteEmp(${oi})" style="color:var(--red)">&#128465;</button>
       </div></td>
@@ -443,7 +491,6 @@ async function saveEmployee(){
   const newLvStart=document.getElementById('f_lv_start').value;
   const newLvEnd=document.getElementById('f_lv_end').value;
 
-  // Auto-track vacation history: if editing and lastVacStart changed, push old one into history
   if(editIdx!==null){
     const old=employees[editIdx];
     if(old.lastVacStart && (old.lastVacStart!==newLvStart || old.lastVacEnd!==newLvEnd)){
@@ -453,11 +500,10 @@ async function saveEmployee(){
   }
 
   const newSalary=Number(document.getElementById('f_salary').value)||0;
-  // Auto-track salary history: if editing and salary changed, push old into history
   if(editIdx!==null){
     const old=employees[editIdx];
     if(old.currentSalary && old.currentSalary!==newSalary){
-      const alreadyIn=currentSalaryHistory.some(s=>s.amount===old.currentSalary && s.date===(old.salaryChangeDate||old.joiningDate));
+      const alreadyIn=currentSalaryHistory.some(s=>s.amount===old.currentSalary && s.date===(old._lastSalaryDate||old.joiningDate));
       if(!alreadyIn)currentSalaryHistory.push({date:old._lastSalaryDate||old.joiningDate||'',amount:old.currentSalary});
     }
   }
@@ -486,7 +532,7 @@ async function saveEmployee(){
   if(!emp.name||!emp.empId){showToast('Name and Employee ID are required.',true);return}
   const btn=document.getElementById('saveBtn');btn.textContent='Saving…';btn.disabled=true;
   try{
-    if(editIdx!==null){await fetch(`/api/employees/${editIdx}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(emp)});showToast('Employee updated ✓');}
+    if(editIdx!==null){await fetch(`/api/employees/${employees[editIdx]._id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(emp)});showToast('Employee updated ✓');}
     else{await fetch('/api/employees',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(emp)});showToast('Employee added ✓');}
     closeModal();await loadData();
   }catch(e){showToast('Save failed',true)}
@@ -495,11 +541,12 @@ async function saveEmployee(){
 
 async function deleteEmp(i){
   if(!confirm(`Delete ${employees[i].name}?`))return;
-  try{await fetch(`/api/employees/${i}`,{method:'DELETE'});showToast('Employee deleted');await loadData();}
+  try{await fetch(`/api/employees/${employees[i]._id}`,{method:'DELETE'});showToast('Employee deleted');await loadData();}
   catch(e){showToast('Delete failed',true)}
 }
 
 function openDetail(i){
+  reportEmpIdx=i;
   const e=employees[i],vs=vacStatus(e),ls=loanStatus(e),is=idStatus(e);
   const lv=e.lastVacStart?(dFmt(e.lastVacStart)+(e.lastVacEnd?' – '+dFmt(e.lastVacEnd):'')):'Not recorded';
   const nv=e.nextVacStart?(dFmt(e.nextVacStart)+(e.nextVacEnd?' – '+dFmt(e.nextVacEnd):'')):'Not scheduled';
@@ -571,9 +618,119 @@ function openDetail(i){
   `;
   document.getElementById('detailModal').classList.add('open');
 }
+let reportEmpIdx=null;
+
+function openReport(i){
+  reportEmpIdx=i;
+  renderReport(employees[i]);
+  document.getElementById('reportModal').classList.add('open');
+}
+function openReportFromDetail(){
+  if(reportEmpIdx===null && employees.length){
+    // fallback: find currently open detail employee via name match isn't reliable, so this is triggered only via openDetail flow
+  }
+  closeDetail();
+  if(reportEmpIdx!==null){
+    renderReport(employees[reportEmpIdx]);
+    document.getElementById('reportModal').classList.add('open');
+  }
+}
+function closeReport(){document.getElementById('reportModal').classList.remove('open')}
+function printReport(){window.print()}
+
+function renderReport(e){
+  const vs=vacStatus(e),ls=loanStatus(e),is=idStatus(e);
+  const tenure=yearsFrom(e.joiningDate);
+  const loanPaid=e.loanAmount>0?e.loanAmount-e.loanRemaining:0;
+  const monthsLeft=e.loanMonthly>0&&e.loanRemaining>0?Math.ceil(e.loanRemaining/e.loanMonthly):null;
+
+  const vacHistory=Array.isArray(e.vacHistory)?e.vacHistory:[];
+  const allVacations=[...vacHistory];
+  if(e.lastVacStart)allVacations.push({start:e.lastVacStart,end:e.lastVacEnd,current:true});
+  const vacSorted=allVacations.slice().sort((a,b)=>new Date(b.start)-new Date(a.start));
+  const vacRows=vacSorted.length
+    ?vacSorted.map(v=>{
+        const days=v.start&&v.end?Math.round((new Date(v.end)-new Date(v.start))/86400000)+1:'—';
+        return`<tr><td>${dFmt(v.start)}</td><td>${dFmt(v.end)}</td><td>${days}</td><td>${v.current?'Most recent':'Past'}</td></tr>`;
+      }).join('')
+    :'<tr><td colspan="4" style="text-align:center;color:var(--text3)">No vacation records</td></tr>';
+
+  const salaryHistory=Array.isArray(e.salaryHistory)?e.salaryHistory:[];
+  const allSalaries=[...salaryHistory];
+  if(e.currentSalary)allSalaries.push({date:e._lastSalaryDate||'Current',amount:e.currentSalary,current:true});
+  const salarySorted=allSalaries.slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+  let salaryRows='';
+  if(salarySorted.length){
+    salaryRows=salarySorted.map((s,idx)=>{
+      const prev=salarySorted[idx+1];
+      const change=prev?(s.amount-prev.amount):null;
+      const changeStr=change===null?'—':(change>0?`+${fmtSAR(change)}`:(change<0?`-${fmtSAR(Math.abs(change))}`:'No change'));
+      const changeColor=change>0?'color:var(--accent)':change<0?'color:var(--red)':'color:var(--text3)';
+      return`<tr><td>${dFmt(s.date)}</td><td>${fmtSAR(s.amount)}</td><td style="${changeColor}">${changeStr}</td><td>${s.current?'Current':'Past'}</td></tr>`;
+    }).join('');
+  }else{
+    salaryRows='<tr><td colspan="4" style="text-align:center;color:var(--text3)">No salary records</td></tr>';
+  }
+
+  const idDs=daysDiff(e.idExpiry);
+  const idText=!e.idExpiry?'No expiry date set':idDs<0?`Expired ${Math.abs(idDs)} days ago`:idDs<=60?`Expiring in ${idDs} days`:`Valid`;
+
+  document.getElementById('reportContent').innerHTML=`
+    <div id="reportPrintArea">
+      <div class="report-header">
+        <h1>Employee Report — ${e.name}</h1>
+        <p>Generated on ${new Date().toLocaleDateString()} &middot; Employee ID: ${e.empId||'—'}</p>
+      </div>
+
+      <div class="report-section">
+        <h3>Personal &amp; Identity</h3>
+        <div class="report-grid">
+          <div class="report-field"><div class="rf-lbl">Full name</div><div class="rf-val">${e.name}</div></div>
+          <div class="report-field"><div class="rf-lbl">Employee ID</div><div class="rf-val">${e.empId||'—'}</div></div>
+          <div class="report-field"><div class="rf-lbl">Phone</div><div class="rf-val">${e.phone||'—'}</div></div>
+          <div class="report-field"><div class="rf-lbl">Border number</div><div class="rf-val">${e.borderNo||'—'}</div></div>
+          <div class="report-field"><div class="rf-lbl">ID / Iqama expiry</div><div class="rf-val">${dFmt(e.idExpiry)} (${idText})</div></div>
+          <div class="report-field"><div class="rf-lbl">Joining date</div><div class="rf-val">${dFmt(e.joiningDate)}${tenure?' — '+tenure+' years tenure':''}</div></div>
+          <div class="report-field"><div class="rf-lbl">Employer</div><div class="rf-val">${e.employerName||'—'}</div></div>
+          <div class="report-field"><div class="rf-lbl">Employer ID</div><div class="rf-val">${e.employerId||'—'}</div></div>
+        </div>
+      </div>
+
+      <div class="report-section">
+        <h3>Salary History (Full Record)</h3>
+        <table class="report-table">
+          <thead><tr><th>Date</th><th>Amount</th><th>Change</th><th>Status</th></tr></thead>
+          <tbody>${salaryRows}</tbody>
+        </table>
+      </div>
+
+      <div class="report-section">
+        <h3>Vacation History (Full Record)</h3>
+        <table class="report-table">
+          <thead><tr><th>Start</th><th>End</th><th>Days</th><th>Status</th></tr></thead>
+          <tbody>${vacRows}</tbody>
+        </table>
+        <div class="report-field" style="margin-top:8px"><div class="rf-lbl">Next scheduled vacation</div><div class="rf-val">${e.nextVacStart?dFmt(e.nextVacStart)+' to '+dFmt(e.nextVacEnd):'Not scheduled'}</div></div>
+      </div>
+
+      <div class="report-section">
+        <h3>Loan Summary</h3>
+        <div class="report-grid">
+          <div class="report-field"><div class="rf-lbl">Loan amount</div><div class="rf-val">${e.loanAmount?fmtSAR(e.loanAmount):'No loan'}</div></div>
+          <div class="report-field"><div class="rf-lbl">Remaining balance</div><div class="rf-val">${e.loanRemaining?fmtSAR(e.loanRemaining):'—'}</div></div>
+          <div class="report-field"><div class="rf-lbl">Amount paid</div><div class="rf-val">${e.loanAmount?fmtSAR(loanPaid):'—'}</div></div>
+          <div class="report-field"><div class="rf-lbl">Monthly payment</div><div class="rf-val">${e.loanMonthly?fmtSAR(e.loanMonthly):'—'}</div></div>
+          ${monthsLeft?`<div class="report-field"><div class="rf-lbl">Months to payoff</div><div class="rf-val">${monthsLeft} months</div></div>`:''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function closeDetail(){document.getElementById('detailModal').classList.remove('open')}
 document.getElementById('formModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal()});
 document.getElementById('detailModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeDetail()});
+document.getElementById('reportModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeReport()});
 loadData();
 </script>
 </body>
@@ -602,7 +759,10 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
         elif path == '/api/employees':
-            self.send_json(load_employees())
+            try:
+                self.send_json(load_employees())
+            except Exception as ex:
+                self.send_json({'error': str(ex)}, 500)
         else:
             self.send_response(404)
             self.end_headers()
@@ -611,34 +771,35 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == '/api/employees':
             length = int(self.headers.get('Content-Length', 0))
             emp = json.loads(self.rfile.read(length))
-            data = load_employees()
-            data.append(emp)
-            save_employees(data)
-            self.send_json({'status': 'ok'})
+            try:
+                add_employee(emp)
+                self.send_json({'status': 'ok'})
+            except Exception as ex:
+                self.send_json({'error': str(ex)}, 500)
 
     def do_PUT(self):
         path = urlparse(self.path).path
         parts = path.split('/')
         if len(parts) == 4 and parts[2] == 'employees':
-            idx = int(parts[3])
+            doc_id = parts[3]
             length = int(self.headers.get('Content-Length', 0))
             emp = json.loads(self.rfile.read(length))
-            data = load_employees()
-            if 0 <= idx < len(data):
-                data[idx] = emp
-                save_employees(data)
-            self.send_json({'status': 'ok'})
+            try:
+                update_employee(doc_id, emp)
+                self.send_json({'status': 'ok'})
+            except Exception as ex:
+                self.send_json({'error': str(ex)}, 500)
 
     def do_DELETE(self):
         path = urlparse(self.path).path
         parts = path.split('/')
         if len(parts) == 4 and parts[2] == 'employees':
-            idx = int(parts[3])
-            data = load_employees()
-            if 0 <= idx < len(data):
-                data.pop(idx)
-                save_employees(data)
-            self.send_json({'status': 'ok'})
+            doc_id = parts[3]
+            try:
+                delete_employee(doc_id)
+                self.send_json({'status': 'ok'})
+            except Exception as ex:
+                self.send_json({'error': str(ex)}, 500)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8500))
