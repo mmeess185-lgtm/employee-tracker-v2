@@ -4,8 +4,9 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 from pymongo import MongoClient
 from bson import ObjectId
+import auth
 
-MONGO_URI = os.environ.get('MONGO_URI', 'mongodb+srv://admin111:Aa123456@cluster0.mv9vzv4.mongodb.net/?appName=Cluster0')
+MONGO_URI = os.environ['MONGO_URI']
 client = MongoClient(MONGO_URI)
 db = client['employee_tracker']
 collection = db['employees']
@@ -736,6 +737,8 @@ loadData();
 </body>
 </html>"""
 
+HTML = auth.add_logout(HTML)
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
@@ -745,7 +748,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Content-Length', len(body))
-        self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
         self.wfile.write(body)
 
@@ -803,6 +805,6 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8500))
-    server = HTTPServer(('0.0.0.0', port), Handler)
+    server = HTTPServer(('0.0.0.0', port), auth.protect(Handler, 'Employee Tracker'))
     print(f'Employee Tracker running on port {port}')
     server.serve_forever()
