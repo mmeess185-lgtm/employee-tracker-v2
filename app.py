@@ -53,8 +53,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap}
 .search-wrap{position:relative;flex:1;min-width:200px}
 .search-wrap svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--text3);pointer-events:none}
-#searchInput{width:100%;padding:9px 12px 9px 36px;font-size:13px;font-family:var(--font);border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);outline:none}
-#searchInput:focus{border-color:var(--border2)}
+#searchInput,#hrSearch{width:100%;padding:9px 12px 9px 36px;font-size:13px;font-family:var(--font);border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);outline:none}
+#searchInput:focus,#hrSearch:focus{border-color:var(--border2)}
 select.filter{font-size:13px;font-family:var(--font);padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);cursor:pointer;outline:none}
 .btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-family:var(--font);font-weight:500;padding:8px 16px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:background .15s;white-space:nowrap}
 .btn:hover{background:var(--surface2)}
@@ -135,6 +135,17 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
 .history-empty{font-size:12px;color:var(--text3);padding:8px 0}
 .salary-add-row{display:flex;gap:8px;align-items:flex-end;margin-top:8px}
 .salary-add-row .fg{flex:1}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:1.5rem;overflow-x:auto}
+.tab{font:500 13px var(--font);padding:9px 16px;border:none;background:none;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text);border-bottom-color:var(--text)}
+tfoot td{background:var(--surface2);font-weight:600;border-top:1px solid var(--border);font-size:12px}
+.form-hint{font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5}
+.fg input[readonly]{background:var(--surface2);color:var(--text2)}
+.calc-box{background:var(--surface2);border-radius:var(--radius);padding:12px 14px;margin-top:14px;font-size:12px;display:grid;grid-template-columns:1fr auto;gap:5px 16px}
+.calc-box .c-strong{font-weight:600;font-size:13px}
+.num{text-align:right;font-variant-numeric:tabular-nums}
 @media(max-width:600px){.form-grid{grid-template-columns:1fr}.fg.full{grid-column:1}.app{padding:1rem}}
 .report-section{margin-bottom:18px}
 .report-section h3{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid var(--border)}
@@ -170,6 +181,11 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
       <button class="btn btn-primary" onclick="openAdd()">+ Add employee</button>
     </div>
   </div>
+  <div class="tabs">
+    <button class="tab active" data-tab="employees" onclick="switchTab('employees')">&#128101; Employees</button>
+    <button class="tab" data-tab="hr" onclick="switchTab('hr')">&#128188; HR &amp; Payroll</button>
+  </div>
+  <div id="tab-employees">
   <div class="stats" id="statsRow"></div>
   <div class="toolbar">
     <div class="search-wrap">
@@ -217,6 +233,108 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
       </thead>
       <tbody id="tableBody"></tbody>
     </table>
+  </div>
+  </div>
+
+  <div id="tab-hr" style="display:none">
+    <div class="stats" id="hrStatsRow"></div>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="hrSearch" placeholder="Search by name, ID, insurance provider, bank…" oninput="renderHR()">
+      </div>
+      <select class="filter" id="filterEmployer" onchange="renderHR()"><option value="">All employers</option></select>
+      <select class="filter" id="filterIns" onchange="renderHR()">
+        <option value="">All insurance</option>
+        <option value="expired">Insurance expired</option>
+        <option value="soon">Insurance expiring (60d)</option>
+        <option value="none">No insurance</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:32px">#</th>
+            <th>Name</th>
+            <th class="num">Basic</th>
+            <th class="num">Allowances</th>
+            <th class="num">Gross</th>
+            <th class="num">GOSI (emp.)</th>
+            <th class="num">Loan ded.</th>
+            <th class="num">Other ded.</th>
+            <th class="num">Net pay</th>
+            <th class="num">GOSI (employer)</th>
+            <th>Medical insurance</th>
+            <th class="num">Fees / year</th>
+            <th class="num">Cost to company / mo</th>
+            <th style="width:40px"></th>
+          </tr>
+        </thead>
+        <tbody id="hrBody"></tbody>
+        <tfoot id="hrFoot"></tfoot>
+      </table>
+    </div>
+    <p class="form-hint">Basic = the employee's current salary. Loan deduction = monthly loan payment while a balance remains. Cost to company = gross + GOSI employer share + yearly fees &divide; 12.</p>
+  </div>
+</div>
+
+<div class="overlay" id="hrModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="hrModalTitle">HR &amp; payroll</h2>
+      <button class="btn btn-icon" onclick="closeHR()">&#10005;</button>
+    </div>
+    <div class="section-sep">Salary &amp; allowances (monthly, SAR)</div>
+    <div class="form-grid">
+      <div class="fg"><label>Basic salary</label><input id="h_basic" readonly></div>
+      <div class="fg"><label>Housing allowance</label><input type="number" id="h_housing" min="0" placeholder="0"></div>
+      <div class="fg"><label>Transport allowance</label><input type="number" id="h_transport" min="0" placeholder="0"></div>
+      <div class="fg"><label>Other allowances</label><input type="number" id="h_otherAllow" min="0" placeholder="0"></div>
+    </div>
+    <p class="form-hint">Basic salary comes from the employee's current salary. Change it with &#9998; Edit on the Employees tab so the salary history stays correct.</p>
+
+    <div class="section-sep">GOSI (social insurance)</div>
+    <div class="form-grid">
+      <div class="fg"><label>Employee share %</label><input type="number" id="h_gosiEmpPct" min="0" step="0.01" placeholder="0"></div>
+      <div class="fg"><label>Employer share %</label><input type="number" id="h_gosiErPct" min="0" step="0.01" placeholder="2"></div>
+    </div>
+    <p class="form-hint">Calculated on basic + housing (max SAR 45,000). Common rates: non-Saudi 0% / 2%, Saudi 9.75% / 11.75%. Check current GOSI rates.</p>
+
+    <div class="section-sep">Other monthly deductions</div>
+    <div class="form-grid">
+      <div class="fg"><label>Other deductions (SAR / month)</label><input type="number" id="h_otherDed" min="0" placeholder="0"></div>
+      <div class="fg"><label>Deduction note</label><input id="h_otherDedNote" placeholder="e.g. absence, advance"></div>
+    </div>
+
+    <div class="section-sep">Medical insurance</div>
+    <div class="form-grid">
+      <div class="fg"><label>Provider</label><input id="h_insProvider" placeholder="e.g. Bupa, Tawuniya"></div>
+      <div class="fg"><label>Class</label><input id="h_insClass" placeholder="e.g. A, B, C"></div>
+      <div class="fg"><label>Policy / card number</label><input id="h_insPolicy"></div>
+      <div class="fg"><label>Expiry date</label><input type="date" id="h_insExpiry"></div>
+      <div class="fg full"><label>Annual premium (SAR)</label><input type="number" id="h_medicalIns" min="0" placeholder="0"></div>
+    </div>
+
+    <div class="section-sep">Government fees (per year, SAR)</div>
+    <div class="form-grid">
+      <div class="fg"><label>Iqama renewal fee</label><input type="number" id="h_iqamaFee" min="0" placeholder="0"></div>
+      <div class="fg"><label>Work permit fee</label><input type="number" id="h_workPermitFee" min="0" placeholder="0"></div>
+      <div class="fg full"><label>Other yearly fees</label><input type="number" id="h_otherFees" min="0" placeholder="0"></div>
+    </div>
+
+    <div class="section-sep">Bank</div>
+    <div class="form-grid">
+      <div class="fg"><label>Bank name</label><input id="h_bankName" placeholder="e.g. Al Rajhi"></div>
+      <div class="fg"><label>IBAN</label><input id="h_iban" placeholder="SA…"></div>
+    </div>
+
+    <div class="calc-box" id="hrCalcBox"></div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="closeHR()">Cancel</button>
+      <button class="btn btn-primary" id="hrSaveBtn" onclick="saveHR()">Save HR details</button>
+    </div>
   </div>
 </div>
 
@@ -343,7 +461,7 @@ function loanStatus(e){
 function showToast(msg,isErr=false){const t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(isErr?' error':'');void t.offsetWidth;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500)}
 
 async function loadData(){
-  try{const res=await fetch('/api/employees');employees=await res.json();renderTable();}
+  try{const res=await fetch('/api/employees');employees=await res.json();renderTable();renderHR();}
   catch(e){showToast('Could not load data',true)}
 }
 
@@ -714,6 +832,22 @@ function renderReport(e){
         <div class="report-field" style="margin-top:8px"><div class="rf-lbl">Next scheduled vacation</div><div class="rf-val">${e.nextVacStart?dFmt(e.nextVacStart)+' to '+dFmt(e.nextVacEnd):'Not scheduled'}</div></div>
       </div>
 
+      ${(()=>{const c=hrCalc(e),h=e.hr||{};return`<div class="report-section">
+        <h3>HR &amp; Payroll</h3>
+        <div class="report-grid">
+          <div class="report-field"><div class="rf-lbl">Basic salary</div><div class="rf-val">${fmtM(c.basic)}</div></div>
+          <div class="report-field"><div class="rf-lbl">Allowances (housing / transport / other)</div><div class="rf-val">${fmtM(c.housing)} / ${fmtM(c.transport)} / ${fmtM(c.otherAllow)}</div></div>
+          <div class="report-field"><div class="rf-lbl">Gross salary</div><div class="rf-val">${fmtM(c.gross)}</div></div>
+          <div class="report-field"><div class="rf-lbl">Net pay</div><div class="rf-val">${fmtM(c.net)}</div></div>
+          <div class="report-field"><div class="rf-lbl">GOSI (employee / employer)</div><div class="rf-val">${fmtM(c.gosiEmp)} / ${fmtM(c.gosiEr)}</div></div>
+          <div class="report-field"><div class="rf-lbl">Other deductions</div><div class="rf-val">${fmtM(c.otherDed)}${h.otherDedNote?' — '+esc(h.otherDedNote):''}</div></div>
+          <div class="report-field"><div class="rf-lbl">Medical insurance</div><div class="rf-val">${esc(h.insProvider||'—')}${h.insClass?' · Class '+esc(h.insClass):''}${h.insExpiry?' · exp. '+dFmt(h.insExpiry):''}</div></div>
+          <div class="report-field"><div class="rf-lbl">Insurance &amp; gov. fees / year</div><div class="rf-val">${fmtM(c.annualFees)}</div></div>
+          <div class="report-field"><div class="rf-lbl">Bank / IBAN</div><div class="rf-val">${esc(h.bankName||'—')}${h.iban?' · '+esc(h.iban):''}</div></div>
+          <div class="report-field"><div class="rf-lbl">Cost to company / month</div><div class="rf-val">${fmtM(c.costMonthly)}</div></div>
+        </div>
+      </div>`})()}
+
       <div class="report-section">
         <h3>Loan Summary</h3>
         <div class="report-grid">
@@ -727,6 +861,151 @@ function renderReport(e){
     </div>
   `;
 }
+
+// ---------- HR & Payroll ----------
+const GOSI_CAP=45000;
+const HR_NUM=['housing','transport','otherAllow','gosiEmpPct','gosiErPct','otherDed','medicalIns','iqamaFee','workPermitFee','otherFees'];
+const HR_TXT=['otherDedNote','insProvider','insClass','insPolicy','insExpiry','bankName','iban'];
+let hrIdx=null;
+function num(v){return Number(v)||0}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmtM(n){return'SAR '+Number(n||0).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})}
+function hrCalc(e){
+  const h=e.hr||{};
+  const basic=num(e.currentSalary),housing=num(h.housing),transport=num(h.transport),otherAllow=num(h.otherAllow);
+  const allowances=housing+transport+otherAllow,gross=basic+allowances;
+  const gosiBase=Math.min(basic+housing,GOSI_CAP);
+  const gosiEmp=gosiBase*num(h.gosiEmpPct)/100,gosiEr=gosiBase*num(h.gosiErPct)/100;
+  const loan=num(e.loanRemaining)>0?Math.min(num(e.loanMonthly),num(e.loanRemaining)):0;
+  const otherDed=num(h.otherDed),deductions=gosiEmp+loan+otherDed,net=gross-deductions;
+  const annualFees=num(h.medicalIns)+num(h.iqamaFee)+num(h.workPermitFee)+num(h.otherFees);
+  const costMonthly=gross+gosiEr+annualFees/12;
+  return{basic,housing,transport,otherAllow,allowances,gross,gosiBase,gosiEmp,gosiEr,loan,otherDed,deductions,net,annualFees,costMonthly};
+}
+function insStatus(e){
+  const h=e.hr||{};
+  if(!h.insProvider&&!h.insExpiry)return{label:'None',cls:'badge-gray'};
+  if(!h.insExpiry)return{label:'No date',cls:'badge-gray'};
+  const ds=daysDiff(h.insExpiry);
+  if(ds<0)return{label:'Expired',cls:'badge-red'};
+  if(ds<=60)return{label:`${ds}d left`,cls:'badge-amber'};
+  return{label:'Valid',cls:'badge-green'};
+}
+function switchTab(t){
+  document.getElementById('tab-employees').style.display=t==='employees'?'':'none';
+  document.getElementById('tab-hr').style.display=t==='hr'?'':'none';
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  try{localStorage.setItem('et_tab',t)}catch(e){}
+  if(t==='hr')renderHR();
+}
+function renderHR(){
+  const q=document.getElementById('hrSearch').value.toLowerCase();
+  const fi=document.getElementById('filterIns').value;
+  const fe=fillEmployerFilter();
+  let rows=[...employees].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(q)rows=rows.filter(e=>{const h=e.hr||{};return[e.name,e.empId,h.insProvider,h.bankName,h.iban].join(' ').toLowerCase().includes(q)});
+  if(fe)rows=rows.filter(e=>(e.employerName||'').trim()===fe);
+  if(fi==='expired')rows=rows.filter(e=>insStatus(e).cls==='badge-red');
+  if(fi==='soon')rows=rows.filter(e=>insStatus(e).cls==='badge-amber');
+  if(fi==='none')rows=rows.filter(e=>insStatus(e).label==='None');
+  const body=document.getElementById('hrBody'),foot=document.getElementById('hrFoot');
+  renderHRStats(rows);
+  if(!rows.length){body.innerHTML=`<tr><td colspan="14"><div class="state-box"><p>&#128188; No employees found</p></div></td></tr>`;foot.innerHTML='';return}
+  const T={basic:0,allowances:0,gross:0,gosiEmp:0,loan:0,otherDed:0,net:0,gosiEr:0,annualFees:0,costMonthly:0};
+  body.innerHTML=rows.map((e,i)=>{
+    const c=hrCalc(e),h=e.hr||{},is=insStatus(e),oi=employees.indexOf(e);
+    Object.keys(T).forEach(k=>T[k]+=c[k]);
+    return`<tr>
+      <td style="color:var(--text3);font-size:11px">${i+1}</td>
+      <td><div class="td-name">${esc(e.name)}</div><div class="td-mono" style="font-size:10px">${esc(e.empId||'')}</div></td>
+      <td class="num">${c.basic?fmtM(c.basic):'—'}</td>
+      <td class="num">${c.allowances?fmtM(c.allowances):'—'}</td>
+      <td class="num" style="font-weight:500">${fmtM(c.gross)}</td>
+      <td class="num">${c.gosiEmp?fmtM(c.gosiEmp):'—'}</td>
+      <td class="num">${c.loan?fmtM(c.loan):'—'}</td>
+      <td class="num">${c.otherDed?fmtM(c.otherDed):'—'}</td>
+      <td class="num" style="font-weight:600;color:var(--accent)">${fmtM(c.net)}</td>
+      <td class="num">${c.gosiEr?fmtM(c.gosiEr):'—'}</td>
+      <td><div style="font-size:12px">${esc(h.insProvider||'—')}${h.insClass?' · '+esc(h.insClass):''}</div><span class="badge ${is.cls}" style="margin-top:3px">${is.label}${h.insExpiry&&is.cls!=='badge-gray'?' · '+dFmt(h.insExpiry):''}</span></td>
+      <td class="num">${c.annualFees?fmtM(c.annualFees):'—'}</td>
+      <td class="num" style="font-weight:600">${fmtM(c.costMonthly)}</td>
+      <td><button class="btn btn-icon" onclick="openHR(${oi})" title="Edit HR details">&#9998;</button></td>
+    </tr>`;
+  }).join('');
+  foot.innerHTML=`<tr><td></td><td>Total (${rows.length})</td>
+    <td class="num">${fmtM(T.basic)}</td><td class="num">${fmtM(T.allowances)}</td><td class="num">${fmtM(T.gross)}</td>
+    <td class="num">${fmtM(T.gosiEmp)}</td><td class="num">${fmtM(T.loan)}</td><td class="num">${fmtM(T.otherDed)}</td>
+    <td class="num">${fmtM(T.net)}</td><td class="num">${fmtM(T.gosiEr)}</td><td></td>
+    <td class="num">${fmtM(T.annualFees)}</td><td class="num">${fmtM(T.costMonthly)}</td><td></td></tr>`;
+}
+let employerFilterInit=false;
+function fillEmployerFilter(){
+  const sel=document.getElementById('filterEmployer'),cur=sel.value;
+  const names=[...new Set(employees.map(e=>(e.employerName||'').trim()).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">All employers</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  sel.value=names.includes(cur)?cur:'';
+  if(!employerFilterInit&&names.length){employerFilterInit=true;try{const sv=localStorage.getItem('et_hr_employer');if(sv&&names.includes(sv))sel.value=sv}catch(e){}}
+  else{try{localStorage.setItem('et_hr_employer',sel.value)}catch(e){}}
+  return sel.value;
+}
+function renderHRStats(list){
+  const cs=list.map(hrCalc),sum=k=>cs.reduce((s,c)=>s+c[k],0);
+  const insExp=list.filter(e=>insStatus(e).cls==='badge-red').length;
+  const insSoon=list.filter(e=>insStatus(e).cls==='badge-amber').length;
+  const r=n=>Math.round(n).toLocaleString();
+  document.getElementById('hrStatsRow').innerHTML=`
+    <div class="stat-card"><div class="lbl">Gross payroll / mo</div><div class="val sm">SAR ${r(sum('gross'))}</div></div>
+    <div class="stat-card"><div class="lbl">Net payroll / mo</div><div class="val sm">SAR ${r(sum('net'))}</div></div>
+    <div class="stat-card"><div class="lbl">GOSI total / mo</div><div class="val sm">SAR ${r(sum('gosiEmp')+sum('gosiEr'))}</div></div>
+    <div class="stat-card"><div class="lbl">Insurance &amp; fees / yr</div><div class="val sm">SAR ${r(sum('annualFees'))}</div></div>
+    <div class="stat-card"><div class="lbl">Cost to company / mo</div><div class="val sm">SAR ${r(sum('costMonthly'))}</div></div>
+    <div class="stat-card"><div class="lbl">Cost to company / yr</div><div class="val sm">SAR ${r(sum('costMonthly')*12)}</div></div>
+    <div class="stat-card" style="${insExp>0?'border-color:var(--red);background:var(--red-bg)':''}"><div class="lbl">Insurance expired</div><div class="val" style="${insExp>0?'color:var(--red)':''}">${insExp}</div></div>
+    <div class="stat-card" style="${insSoon>0?'border-color:var(--amber);background:var(--amber-bg)':''}"><div class="lbl">Insurance expiring 60d</div><div class="val" style="${insSoon>0?'color:var(--amber)':''}">${insSoon}</div></div>`;
+}
+function readHRForm(){
+  const h={};
+  HR_NUM.forEach(k=>h[k]=num(document.getElementById('h_'+k).value));
+  HR_TXT.forEach(k=>h[k]=document.getElementById('h_'+k).value.trim());
+  return h;
+}
+function updateHRCalc(){
+  if(hrIdx===null)return;
+  const c=hrCalc({...employees[hrIdx],hr:readHRForm()});
+  document.getElementById('hrCalcBox').innerHTML=`
+    <span>Gross salary</span><span class="num">${fmtM(c.gross)}</span>
+    <span>GOSI employee share</span><span class="num">− ${fmtM(c.gosiEmp)}</span>
+    <span>Loan payment</span><span class="num">− ${fmtM(c.loan)}</span>
+    <span>Other deductions</span><span class="num">− ${fmtM(c.otherDed)}</span>
+    <span class="c-strong">Net pay / month</span><span class="num c-strong" style="color:var(--accent)">${fmtM(c.net)}</span>
+    <span>GOSI employer share</span><span class="num">${fmtM(c.gosiEr)}</span>
+    <span>Insurance &amp; fees (÷12)</span><span class="num">${fmtM(c.annualFees/12)}</span>
+    <span class="c-strong">Cost to company / month</span><span class="num c-strong">${fmtM(c.costMonthly)}</span>`;
+}
+function openHR(i){
+  hrIdx=i;const e=employees[i],h=e.hr||{};
+  document.getElementById('hrModalTitle').textContent='HR & payroll — '+(e.name||'');
+  document.getElementById('h_basic').value=e.currentSalary?fmtM(e.currentSalary):'Not set';
+  HR_NUM.forEach(k=>document.getElementById('h_'+k).value=h[k]||'');
+  if(h.gosiErPct===undefined)document.getElementById('h_gosiErPct').value=2;
+  HR_TXT.forEach(k=>document.getElementById('h_'+k).value=h[k]||'');
+  updateHRCalc();
+  document.getElementById('hrModal').classList.add('open');
+}
+function closeHR(){document.getElementById('hrModal').classList.remove('open');hrIdx=null}
+async function saveHR(){
+  if(hrIdx===null)return;
+  const btn=document.getElementById('hrSaveBtn');btn.textContent='Saving…';btn.disabled=true;
+  try{
+    const res=await fetch(`/api/employees/${employees[hrIdx]._id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({hr:readHRForm()})});
+    if(!res.ok)throw new Error();
+    showToast('HR details saved ✓');closeHR();await loadData();
+  }catch(e){showToast('Save failed',true)}
+  finally{btn.textContent='Save HR details';btn.disabled=false}
+}
+document.getElementById('hrModal').addEventListener('input',updateHRCalc);
+document.getElementById('hrModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeHR()});
+try{if(localStorage.getItem('et_tab')==='hr')switchTab('hr')}catch(e){}
 
 function closeDetail(){document.getElementById('detailModal').classList.remove('open')}
 document.getElementById('formModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal()});
