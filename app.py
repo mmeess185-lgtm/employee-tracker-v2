@@ -9,25 +9,35 @@ import auth
 MONGO_URI = os.environ['MONGO_URI']
 client = MongoClient(MONGO_URI)
 db = client['employee_tracker']
-collection = db['employees']
+collection = db['employees']                 # household labor
+wareef_collection = db['wareef_employees']   # Wareef company employees (separate list)
+COLLECTIONS = {'employees': collection, 'wareef': wareef_collection}
 
-def load_employees():
-    docs = list(collection.find())
+def load_employees(col=collection):
+    docs = list(col.find())
     result = []
     for d in docs:
         d['_id'] = str(d['_id'])
         result.append(d)
     return result
 
-def add_employee(emp):
-    collection.insert_one(emp)
-
-def update_employee(doc_id, emp):
+def add_employee(emp, col=collection):
     emp.pop('_id', None)
-    collection.update_one({'_id': ObjectId(doc_id)}, {'$set': emp})
+    col.insert_one(emp)
 
-def delete_employee(doc_id):
-    collection.delete_one({'_id': ObjectId(doc_id)})
+def update_employee(doc_id, emp, col=collection):
+    emp.pop('_id', None)
+    col.update_one({'_id': ObjectId(doc_id)}, {'$set': emp})
+
+def delete_employee(doc_id, col=collection):
+    col.delete_one({'_id': ObjectId(doc_id)})
+
+def api_collection(path):
+    """'/api/wareef' -> (collection, None); '/api/wareef/<id>' -> (collection, id)."""
+    parts = path.split('/')
+    if len(parts) in (3, 4) and parts[1] == 'api' and parts[2] in COLLECTIONS:
+        return COLLECTIONS[parts[2]], (parts[3] if len(parts) == 4 else None)
+    return None, None
 
 HTML = r"""<!DOCTYPE html>
 <html lang="en">
@@ -94,6 +104,7 @@ td{padding:10px 12px;vertical-align:middle;white-space:nowrap}
 .fg.full{grid-column:1/-1}
 .fg label{font-size:11px;font-weight:500;color:var(--text2)}
 .fg input{font-size:13px;font-family:var(--font);padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);outline:none}
+.fg select{font-size:13px;font-family:var(--font);padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);outline:none}
 .fg input:focus{border-color:var(--border2)}
 .modal-actions{display:flex;gap:8px;margin-top:1.5rem;justify-content:flex-end}
 .d-header{display:flex;align-items:center;gap:14px;margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border)}
@@ -153,7 +164,7 @@ tfoot td{background:var(--surface2);font-weight:600;border-top:1px solid var(--b
 .report-field{font-size:12px}
 .report-field .rf-lbl{color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
 .report-field .rf-val{font-weight:500;color:var(--text)}
-.report-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+.report-table{width:100%;min-width:0;border-collapse:collapse;font-size:12px;margin-top:6px}
 .report-table th{background:var(--surface2);padding:6px 10px;text-align:left;font-weight:500;font-size:11px;color:var(--text2);border-bottom:1px solid var(--border)}
 .report-table td{padding:6px 10px;border-bottom:1px solid var(--border)}
 .report-header{text-align:center;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid var(--text)}
@@ -177,13 +188,13 @@ tfoot td{background:var(--surface2);font-weight:600;border-top:1px solid var(--b
       <p><span class="sync-dot"></span>Data saved in cloud database</p>
     </div>
     <div class="header-right">
-      <button class="btn" onclick="loadData()">&#8635; Refresh</button>
-      <button class="btn btn-primary" onclick="openAdd()">+ Add employee</button>
+      <button class="btn" onclick="loadData();loadWareef()">&#8635; Refresh</button>
+      <button class="btn btn-primary" id="addBtn" onclick="addForTab()">+ Add household worker</button>
     </div>
   </div>
   <div class="tabs">
-    <button class="tab active" data-tab="employees" onclick="switchTab('employees')">&#128101; Employees</button>
-    <button class="tab" data-tab="hr" onclick="switchTab('hr')">&#128188; HR &amp; Payroll</button>
+    <button class="tab active" data-tab="employees" onclick="switchTab('employees')">&#127968; Household labor</button>
+    <button class="tab" data-tab="hr" onclick="switchTab('hr')">&#127970; Wareef employees</button>
   </div>
   <div id="tab-employees">
   <div class="stats" id="statsRow"></div>
@@ -241,9 +252,18 @@ tfoot td{background:var(--surface2);font-weight:600;border-top:1px solid var(--b
     <div class="toolbar">
       <div class="search-wrap">
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input id="hrSearch" placeholder="Search by name, ID, insurance provider, bank…" oninput="renderHR()">
+        <input id="hrSearch" placeholder="Search by name, ID, job title, Iqama, insurance, bank…" oninput="renderHR()">
       </div>
-      <select class="filter" id="filterEmployer" onchange="renderHR()"><option value="">All employers</option></select>
+      <select class="filter" id="filterNat" onchange="renderHR()">
+        <option value="">All nationalities</option>
+        <option value="Saudi">Saudi</option>
+        <option value="Non-Saudi">Non-Saudi</option>
+      </select>
+      <select class="filter" id="filterHrId" onchange="renderHR()">
+        <option value="">All ID status</option>
+        <option value="expired">ID expired</option>
+        <option value="soon">ID expiring soon (60d)</option>
+      </select>
       <select class="filter" id="filterIns" onchange="renderHR()">
         <option value="">All insurance</option>
         <option value="expired">Insurance expired</option>
@@ -256,55 +276,68 @@ tfoot td{background:var(--surface2);font-weight:600;border-top:1px solid var(--b
         <thead>
           <tr>
             <th style="width:32px">#</th>
-            <th>Name</th>
+            <th>Name / job title</th>
+            <th>Iqama / ID</th>
             <th class="num">Basic</th>
             <th class="num">Allowances</th>
             <th class="num">Gross</th>
             <th class="num">GOSI (emp.)</th>
-            <th class="num">Loan ded.</th>
             <th class="num">Other ded.</th>
             <th class="num">Net pay</th>
             <th class="num">GOSI (employer)</th>
             <th>Medical insurance</th>
             <th class="num">Fees / year</th>
             <th class="num">Cost to company / mo</th>
-            <th style="width:40px"></th>
+            <th style="width:96px"></th>
           </tr>
         </thead>
         <tbody id="hrBody"></tbody>
         <tfoot id="hrFoot"></tfoot>
       </table>
     </div>
-    <p class="form-hint">Basic = the employee's current salary. Loan deduction = monthly loan payment while a balance remains. Cost to company = gross + GOSI employer share + yearly fees &divide; 12.</p>
+    <p class="form-hint">Wareef employees are a separate list from household labor. Other ded. = loan/advance + other deductions. Cost to company = gross + GOSI employer share + yearly fees &divide; 12.</p>
   </div>
 </div>
 
 <div class="overlay" id="hrModal">
   <div class="modal">
     <div class="modal-header">
-      <h2 id="hrModalTitle">HR &amp; payroll</h2>
+      <h2 id="hrModalTitle">Add Wareef employee</h2>
       <button class="btn btn-icon" onclick="closeHR()">&#10005;</button>
     </div>
+    <div class="section-sep">Personal &amp; job</div>
+    <div class="form-grid">
+      <div class="fg full"><label>Full name *</label><input id="h_name" placeholder="e.g. Khalid Al-Otaibi"></div>
+      <div class="fg"><label>Employee ID *</label><input id="h_empId" placeholder="e.g. WR-001"></div>
+      <div class="fg"><label>Nationality</label><select id="h_nationality" onchange="natChanged()"><option value="Non-Saudi">Non-Saudi</option><option value="Saudi">Saudi</option></select></div>
+      <div class="fg"><label>Job title</label><input id="h_jobTitle" placeholder="e.g. Accountant"></div>
+      <div class="fg"><label>Department</label><input id="h_department" placeholder="e.g. Finance"></div>
+      <div class="fg"><label>Phone number</label><input id="h_phone" placeholder="e.g. +966501234567"></div>
+      <div class="fg"><label>Iqama / national ID number</label><input id="h_idNumber"></div>
+      <div class="fg"><label>ID expiry date</label><input type="date" id="h_idExpiry"></div>
+      <div class="fg"><label>Joining date</label><input type="date" id="h_joiningDate"></div>
+    </div>
+
     <div class="section-sep">Salary &amp; allowances (monthly, SAR)</div>
     <div class="form-grid">
-      <div class="fg"><label>Basic salary</label><input id="h_basic" readonly></div>
+      <div class="fg"><label>Basic salary</label><input type="number" id="h_basic" min="0" placeholder="0"></div>
       <div class="fg"><label>Housing allowance</label><input type="number" id="h_housing" min="0" placeholder="0"></div>
       <div class="fg"><label>Transport allowance</label><input type="number" id="h_transport" min="0" placeholder="0"></div>
       <div class="fg"><label>Other allowances</label><input type="number" id="h_otherAllow" min="0" placeholder="0"></div>
     </div>
-    <p class="form-hint">Basic salary comes from the employee's current salary. Change it with &#9998; Edit on the Employees tab so the salary history stays correct.</p>
 
     <div class="section-sep">GOSI (social insurance)</div>
     <div class="form-grid">
       <div class="fg"><label>Employee share %</label><input type="number" id="h_gosiEmpPct" min="0" step="0.01" placeholder="0"></div>
-      <div class="fg"><label>Employer share %</label><input type="number" id="h_gosiErPct" min="0" step="0.01" placeholder="2"></div>
+      <div class="fg"><label>Employer share %</label><input type="number" id="h_gosiErPct" min="0" step="0.01" placeholder="0"></div>
     </div>
-    <p class="form-hint">Calculated on basic + housing (max SAR 45,000). Common rates: non-Saudi 0% / 2%, Saudi 9.75% / 11.75%. Check current GOSI rates.</p>
+    <p class="form-hint">Calculated on basic + housing (max SAR 45,000). Picking a nationality fills common rates (non-Saudi 0% / 2%, Saudi 9.75% / 11.75%). Check current GOSI rates.</p>
 
-    <div class="section-sep">Other monthly deductions</div>
+    <div class="section-sep">Monthly deductions</div>
     <div class="form-grid">
+      <div class="fg"><label>Loan / advance (SAR / month)</label><input type="number" id="h_loanDed" min="0" placeholder="0"></div>
       <div class="fg"><label>Other deductions (SAR / month)</label><input type="number" id="h_otherDed" min="0" placeholder="0"></div>
-      <div class="fg"><label>Deduction note</label><input id="h_otherDedNote" placeholder="e.g. absence, advance"></div>
+      <div class="fg full"><label>Deduction note</label><input id="h_otherDedNote" placeholder="e.g. absence, advance"></div>
     </div>
 
     <div class="section-sep">Medical insurance</div>
@@ -333,7 +366,7 @@ tfoot td{background:var(--surface2);font-weight:600;border-top:1px solid var(--b
 
     <div class="modal-actions">
       <button class="btn" onclick="closeHR()">Cancel</button>
-      <button class="btn btn-primary" id="hrSaveBtn" onclick="saveHR()">Save HR details</button>
+      <button class="btn btn-primary" id="hrSaveBtn" onclick="saveHR()">Save employee</button>
     </div>
   </div>
 </div>
@@ -461,7 +494,7 @@ function loanStatus(e){
 function showToast(msg,isErr=false){const t=document.getElementById('toast');t.textContent=msg;t.className='toast'+(isErr?' error':'');void t.offsetWidth;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500)}
 
 async function loadData(){
-  try{const res=await fetch('/api/employees');employees=await res.json();renderTable();renderHR();}
+  try{const res=await fetch('/api/employees');employees=await res.json();renderTable();}
   catch(e){showToast('Could not load data',true)}
 }
 
@@ -832,22 +865,6 @@ function renderReport(e){
         <div class="report-field" style="margin-top:8px"><div class="rf-lbl">Next scheduled vacation</div><div class="rf-val">${e.nextVacStart?dFmt(e.nextVacStart)+' to '+dFmt(e.nextVacEnd):'Not scheduled'}</div></div>
       </div>
 
-      ${(()=>{const c=hrCalc(e),h=e.hr||{};return`<div class="report-section">
-        <h3>HR &amp; Payroll</h3>
-        <div class="report-grid">
-          <div class="report-field"><div class="rf-lbl">Basic salary</div><div class="rf-val">${fmtM(c.basic)}</div></div>
-          <div class="report-field"><div class="rf-lbl">Allowances (housing / transport / other)</div><div class="rf-val">${fmtM(c.housing)} / ${fmtM(c.transport)} / ${fmtM(c.otherAllow)}</div></div>
-          <div class="report-field"><div class="rf-lbl">Gross salary</div><div class="rf-val">${fmtM(c.gross)}</div></div>
-          <div class="report-field"><div class="rf-lbl">Net pay</div><div class="rf-val">${fmtM(c.net)}</div></div>
-          <div class="report-field"><div class="rf-lbl">GOSI (employee / employer)</div><div class="rf-val">${fmtM(c.gosiEmp)} / ${fmtM(c.gosiEr)}</div></div>
-          <div class="report-field"><div class="rf-lbl">Other deductions</div><div class="rf-val">${fmtM(c.otherDed)}${h.otherDedNote?' — '+esc(h.otherDedNote):''}</div></div>
-          <div class="report-field"><div class="rf-lbl">Medical insurance</div><div class="rf-val">${esc(h.insProvider||'—')}${h.insClass?' · Class '+esc(h.insClass):''}${h.insExpiry?' · exp. '+dFmt(h.insExpiry):''}</div></div>
-          <div class="report-field"><div class="rf-lbl">Insurance &amp; gov. fees / year</div><div class="rf-val">${fmtM(c.annualFees)}</div></div>
-          <div class="report-field"><div class="rf-lbl">Bank / IBAN</div><div class="rf-val">${esc(h.bankName||'—')}${h.iban?' · '+esc(h.iban):''}</div></div>
-          <div class="report-field"><div class="rf-lbl">Cost to company / month</div><div class="rf-val">${fmtM(c.costMonthly)}</div></div>
-        </div>
-      </div>`})()}
-
       <div class="report-section">
         <h3>Loan Summary</h3>
         <div class="report-grid">
@@ -862,150 +879,208 @@ function renderReport(e){
   `;
 }
 
-// ---------- HR & Payroll ----------
+// ---------- Wareef employees (separate list, /api/wareef) ----------
 const GOSI_CAP=45000;
-const HR_NUM=['housing','transport','otherAllow','gosiEmpPct','gosiErPct','otherDed','medicalIns','iqamaFee','workPermitFee','otherFees'];
-const HR_TXT=['otherDedNote','insProvider','insClass','insPolicy','insExpiry','bankName','iban'];
-let hrIdx=null;
+const W_NUM=['basic','housing','transport','otherAllow','gosiEmpPct','gosiErPct','loanDed','otherDed','medicalIns','iqamaFee','workPermitFee','otherFees'];
+const W_TXT=['name','empId','nationality','jobTitle','department','phone','idNumber','idExpiry','joiningDate','otherDedNote','insProvider','insClass','insPolicy','insExpiry','bankName','iban'];
+const GOSI_RATES={'Saudi':[9.75,11.75],'Non-Saudi':[0,2]};
+let wareef=[],hrIdx=null,activeTab='employees';
 function num(v){return Number(v)||0}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function fmtM(n){return'SAR '+Number(n||0).toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:2})}
-function hrCalc(e){
-  const h=e.hr||{};
-  const basic=num(e.currentSalary),housing=num(h.housing),transport=num(h.transport),otherAllow=num(h.otherAllow);
+function hrCalc(w){
+  const basic=num(w.basic),housing=num(w.housing),transport=num(w.transport),otherAllow=num(w.otherAllow);
   const allowances=housing+transport+otherAllow,gross=basic+allowances;
   const gosiBase=Math.min(basic+housing,GOSI_CAP);
-  const gosiEmp=gosiBase*num(h.gosiEmpPct)/100,gosiEr=gosiBase*num(h.gosiErPct)/100;
-  const loan=num(e.loanRemaining)>0?Math.min(num(e.loanMonthly),num(e.loanRemaining)):0;
-  const otherDed=num(h.otherDed),deductions=gosiEmp+loan+otherDed,net=gross-deductions;
-  const annualFees=num(h.medicalIns)+num(h.iqamaFee)+num(h.workPermitFee)+num(h.otherFees);
+  const gosiEmp=gosiBase*num(w.gosiEmpPct)/100,gosiEr=gosiBase*num(w.gosiErPct)/100;
+  const loan=num(w.loanDed),otherDed=num(w.otherDed),deductions=gosiEmp+loan+otherDed,net=gross-deductions;
+  const annualFees=num(w.medicalIns)+num(w.iqamaFee)+num(w.workPermitFee)+num(w.otherFees);
   const costMonthly=gross+gosiEr+annualFees/12;
   return{basic,housing,transport,otherAllow,allowances,gross,gosiBase,gosiEmp,gosiEr,loan,otherDed,deductions,net,annualFees,costMonthly};
 }
-function insStatus(e){
-  const h=e.hr||{};
-  if(!h.insProvider&&!h.insExpiry)return{label:'None',cls:'badge-gray'};
-  if(!h.insExpiry)return{label:'No date',cls:'badge-gray'};
-  const ds=daysDiff(h.insExpiry);
+function insStatus(w){
+  if(!w.insProvider&&!w.insExpiry)return{label:'None',cls:'badge-gray'};
+  if(!w.insExpiry)return{label:'No date',cls:'badge-gray'};
+  const ds=daysDiff(w.insExpiry);
   if(ds<0)return{label:'Expired',cls:'badge-red'};
   if(ds<=60)return{label:`${ds}d left`,cls:'badge-amber'};
   return{label:'Valid',cls:'badge-green'};
 }
 function switchTab(t){
+  activeTab=t;
   document.getElementById('tab-employees').style.display=t==='employees'?'':'none';
   document.getElementById('tab-hr').style.display=t==='hr'?'':'none';
   document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  document.getElementById('addBtn').textContent=t==='hr'?'+ Add Wareef employee':'+ Add household worker';
   try{localStorage.setItem('et_tab',t)}catch(e){}
   if(t==='hr')renderHR();
 }
+function addForTab(){activeTab==='hr'?openHR(null):openAdd()}
+async function loadWareef(){
+  try{const res=await fetch('/api/wareef');if(!res.ok)throw new Error();wareef=await res.json();renderHR();}
+  catch(e){showToast('Could not load Wareef employees',true)}
+}
 function renderHR(){
   const q=document.getElementById('hrSearch').value.toLowerCase();
+  const fn=document.getElementById('filterNat').value;
+  const fd=document.getElementById('filterHrId').value;
   const fi=document.getElementById('filterIns').value;
-  const fe=fillEmployerFilter();
-  let rows=[...employees].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  if(q)rows=rows.filter(e=>{const h=e.hr||{};return[e.name,e.empId,h.insProvider,h.bankName,h.iban].join(' ').toLowerCase().includes(q)});
-  if(fe)rows=rows.filter(e=>(e.employerName||'').trim()===fe);
-  if(fi==='expired')rows=rows.filter(e=>insStatus(e).cls==='badge-red');
-  if(fi==='soon')rows=rows.filter(e=>insStatus(e).cls==='badge-amber');
-  if(fi==='none')rows=rows.filter(e=>insStatus(e).label==='None');
+  let rows=[...wareef].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  if(q)rows=rows.filter(w=>[w.name,w.empId,w.jobTitle,w.department,w.idNumber,w.insProvider,w.bankName,w.iban,w.phone].join(' ').toLowerCase().includes(q));
+  if(fn)rows=rows.filter(w=>(w.nationality||'Non-Saudi')===fn);
+  if(fd==='expired')rows=rows.filter(w=>w.idExpiry&&daysDiff(w.idExpiry)<0);
+  if(fd==='soon')rows=rows.filter(w=>{const ds=daysDiff(w.idExpiry);return w.idExpiry&&ds>=0&&ds<=60});
+  if(fi==='expired')rows=rows.filter(w=>insStatus(w).cls==='badge-red');
+  if(fi==='soon')rows=rows.filter(w=>insStatus(w).cls==='badge-amber');
+  if(fi==='none')rows=rows.filter(w=>insStatus(w).label==='None');
+  renderHRStats();
   const body=document.getElementById('hrBody'),foot=document.getElementById('hrFoot');
-  renderHRStats(rows);
-  if(!rows.length){body.innerHTML=`<tr><td colspan="14"><div class="state-box"><p>&#128188; No employees found</p></div></td></tr>`;foot.innerHTML='';return}
-  const T={basic:0,allowances:0,gross:0,gosiEmp:0,loan:0,otherDed:0,net:0,gosiEr:0,annualFees:0,costMonthly:0};
-  body.innerHTML=rows.map((e,i)=>{
-    const c=hrCalc(e),h=e.hr||{},is=insStatus(e),oi=employees.indexOf(e);
+  if(!rows.length){body.innerHTML=`<tr><td colspan="14"><div class="state-box"><p>&#127970; No Wareef employees found</p><p class="sub">Add one with the "+ Add Wareef employee" button above</p></div></td></tr>`;foot.innerHTML='';return}
+  const T={basic:0,allowances:0,gross:0,gosiEmp:0,otherAll:0,net:0,gosiEr:0,annualFees:0,costMonthly:0};
+  body.innerHTML=rows.map((w,i)=>{
+    const c=hrCalc(w),is=insStatus(w),ids=idStatus(w),oi=wareef.indexOf(w);
+    c.otherAll=c.loan+c.otherDed;
     Object.keys(T).forEach(k=>T[k]+=c[k]);
     return`<tr>
       <td style="color:var(--text3);font-size:11px">${i+1}</td>
-      <td><div class="td-name">${esc(e.name)}</div><div class="td-mono" style="font-size:10px">${esc(e.empId||'')}</div></td>
+      <td><div class="td-name">${esc(w.name)}</div><div style="font-size:11px;color:var(--text2)">${esc(w.jobTitle||'')}${w.jobTitle&&w.empId?' · ':''}<span class="td-mono" style="font-size:10px">${esc(w.empId||'')}</span></div></td>
+      <td><div class="td-mono">${esc(w.idNumber||'—')}</div><span class="badge ${ids.cls}" style="margin-top:3px">${ids.label}</span></td>
       <td class="num">${c.basic?fmtM(c.basic):'—'}</td>
       <td class="num">${c.allowances?fmtM(c.allowances):'—'}</td>
       <td class="num" style="font-weight:500">${fmtM(c.gross)}</td>
       <td class="num">${c.gosiEmp?fmtM(c.gosiEmp):'—'}</td>
-      <td class="num">${c.loan?fmtM(c.loan):'—'}</td>
-      <td class="num">${c.otherDed?fmtM(c.otherDed):'—'}</td>
+      <td class="num">${c.otherAll?fmtM(c.otherAll):'—'}</td>
       <td class="num" style="font-weight:600;color:var(--accent)">${fmtM(c.net)}</td>
       <td class="num">${c.gosiEr?fmtM(c.gosiEr):'—'}</td>
-      <td><div style="font-size:12px">${esc(h.insProvider||'—')}${h.insClass?' · '+esc(h.insClass):''}</div><span class="badge ${is.cls}" style="margin-top:3px">${is.label}${h.insExpiry&&is.cls!=='badge-gray'?' · '+dFmt(h.insExpiry):''}</span></td>
+      <td><div style="font-size:12px">${esc(w.insProvider||'—')}${w.insClass?' · '+esc(w.insClass):''}</div><span class="badge ${is.cls}" style="margin-top:3px">${is.label}${w.insExpiry&&is.cls!=='badge-gray'?' · '+dFmt(w.insExpiry):''}</span></td>
       <td class="num">${c.annualFees?fmtM(c.annualFees):'—'}</td>
       <td class="num" style="font-weight:600">${fmtM(c.costMonthly)}</td>
-      <td><button class="btn btn-icon" onclick="openHR(${oi})" title="Edit HR details">&#9998;</button></td>
+      <td><div class="row-actions">
+        <button class="btn btn-icon" onclick="openWareefReport(${oi})" title="Report">&#128203;</button>
+        <button class="btn btn-icon" onclick="openHR(${oi})" title="Edit">&#9998;</button>
+        <button class="btn btn-icon" onclick="deleteWareef(${oi})" title="Delete" style="color:var(--red)">&#128465;</button>
+      </div></td>
     </tr>`;
   }).join('');
-  foot.innerHTML=`<tr><td></td><td>Total (${rows.length})</td>
+  foot.innerHTML=`<tr><td></td><td>Total (${rows.length})</td><td></td>
     <td class="num">${fmtM(T.basic)}</td><td class="num">${fmtM(T.allowances)}</td><td class="num">${fmtM(T.gross)}</td>
-    <td class="num">${fmtM(T.gosiEmp)}</td><td class="num">${fmtM(T.loan)}</td><td class="num">${fmtM(T.otherDed)}</td>
+    <td class="num">${fmtM(T.gosiEmp)}</td><td class="num">${fmtM(T.otherAll)}</td>
     <td class="num">${fmtM(T.net)}</td><td class="num">${fmtM(T.gosiEr)}</td><td></td>
     <td class="num">${fmtM(T.annualFees)}</td><td class="num">${fmtM(T.costMonthly)}</td><td></td></tr>`;
 }
-let employerFilterInit=false;
-function fillEmployerFilter(){
-  const sel=document.getElementById('filterEmployer'),cur=sel.value;
-  const names=[...new Set(employees.map(e=>(e.employerName||'').trim()).filter(Boolean))].sort();
-  sel.innerHTML='<option value="">All employers</option>'+names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
-  sel.value=names.includes(cur)?cur:'';
-  if(!employerFilterInit&&names.length){employerFilterInit=true;try{const sv=localStorage.getItem('et_hr_employer');if(sv&&names.includes(sv))sel.value=sv}catch(e){}}
-  else{try{localStorage.setItem('et_hr_employer',sel.value)}catch(e){}}
-  return sel.value;
-}
-function renderHRStats(list){
-  const cs=list.map(hrCalc),sum=k=>cs.reduce((s,c)=>s+c[k],0);
-  const insExp=list.filter(e=>insStatus(e).cls==='badge-red').length;
-  const insSoon=list.filter(e=>insStatus(e).cls==='badge-amber').length;
+function renderHRStats(){
+  const cs=wareef.map(hrCalc),sum=k=>cs.reduce((s,c)=>s+c[k],0);
+  const saudi=wareef.filter(w=>w.nationality==='Saudi').length;
+  const insExp=wareef.filter(w=>insStatus(w).cls==='badge-red').length;
+  const insSoon=wareef.filter(w=>insStatus(w).cls==='badge-amber').length;
+  const idExp=wareef.filter(w=>w.idExpiry&&daysDiff(w.idExpiry)<0).length;
+  const idSoon=wareef.filter(w=>{const ds=daysDiff(w.idExpiry);return w.idExpiry&&ds>=0&&ds<=60}).length;
   const r=n=>Math.round(n).toLocaleString();
+  const warn=(n,c)=>n>0?`border-color:var(--${c});background:var(--${c}-bg)`:'';
   document.getElementById('hrStatsRow').innerHTML=`
+    <div class="stat-card"><div class="lbl">Wareef employees</div><div class="val">${wareef.length}</div></div>
+    <div class="stat-card"><div class="lbl">Saudi / non-Saudi</div><div class="val sm">${saudi} / ${wareef.length-saudi}</div></div>
     <div class="stat-card"><div class="lbl">Gross payroll / mo</div><div class="val sm">SAR ${r(sum('gross'))}</div></div>
     <div class="stat-card"><div class="lbl">Net payroll / mo</div><div class="val sm">SAR ${r(sum('net'))}</div></div>
     <div class="stat-card"><div class="lbl">GOSI total / mo</div><div class="val sm">SAR ${r(sum('gosiEmp')+sum('gosiEr'))}</div></div>
     <div class="stat-card"><div class="lbl">Insurance &amp; fees / yr</div><div class="val sm">SAR ${r(sum('annualFees'))}</div></div>
     <div class="stat-card"><div class="lbl">Cost to company / mo</div><div class="val sm">SAR ${r(sum('costMonthly'))}</div></div>
     <div class="stat-card"><div class="lbl">Cost to company / yr</div><div class="val sm">SAR ${r(sum('costMonthly')*12)}</div></div>
-    <div class="stat-card" style="${insExp>0?'border-color:var(--red);background:var(--red-bg)':''}"><div class="lbl">Insurance expired</div><div class="val" style="${insExp>0?'color:var(--red)':''}">${insExp}</div></div>
-    <div class="stat-card" style="${insSoon>0?'border-color:var(--amber);background:var(--amber-bg)':''}"><div class="lbl">Insurance expiring 60d</div><div class="val" style="${insSoon>0?'color:var(--amber)':''}">${insSoon}</div></div>`;
+    <div class="stat-card" style="${warn(idExp,'red')}"><div class="lbl">ID expired</div><div class="val">${idExp}</div></div>
+    <div class="stat-card" style="${warn(idSoon,'amber')}"><div class="lbl">ID expiring 60d</div><div class="val">${idSoon}</div></div>
+    <div class="stat-card" style="${warn(insExp,'red')}"><div class="lbl">Insurance expired</div><div class="val">${insExp}</div></div>
+    <div class="stat-card" style="${warn(insSoon,'amber')}"><div class="lbl">Insurance expiring 60d</div><div class="val">${insSoon}</div></div>`;
 }
 function readHRForm(){
-  const h={};
-  HR_NUM.forEach(k=>h[k]=num(document.getElementById('h_'+k).value));
-  HR_TXT.forEach(k=>h[k]=document.getElementById('h_'+k).value.trim());
-  return h;
+  const w={};
+  W_NUM.forEach(k=>w[k]=num(document.getElementById('h_'+k).value));
+  W_TXT.forEach(k=>w[k]=document.getElementById('h_'+k).value.trim());
+  return w;
 }
 function updateHRCalc(){
-  if(hrIdx===null)return;
-  const c=hrCalc({...employees[hrIdx],hr:readHRForm()});
+  const c=hrCalc(readHRForm());
   document.getElementById('hrCalcBox').innerHTML=`
     <span>Gross salary</span><span class="num">${fmtM(c.gross)}</span>
     <span>GOSI employee share</span><span class="num">− ${fmtM(c.gosiEmp)}</span>
-    <span>Loan payment</span><span class="num">− ${fmtM(c.loan)}</span>
+    <span>Loan / advance</span><span class="num">− ${fmtM(c.loan)}</span>
     <span>Other deductions</span><span class="num">− ${fmtM(c.otherDed)}</span>
     <span class="c-strong">Net pay / month</span><span class="num c-strong" style="color:var(--accent)">${fmtM(c.net)}</span>
     <span>GOSI employer share</span><span class="num">${fmtM(c.gosiEr)}</span>
     <span>Insurance &amp; fees (÷12)</span><span class="num">${fmtM(c.annualFees/12)}</span>
     <span class="c-strong">Cost to company / month</span><span class="num c-strong">${fmtM(c.costMonthly)}</span>`;
 }
+function natChanged(){
+  const [e,r]=GOSI_RATES[document.getElementById('h_nationality').value]||[0,0];
+  document.getElementById('h_gosiEmpPct').value=e;document.getElementById('h_gosiErPct').value=r;updateHRCalc();
+}
 function openHR(i){
-  hrIdx=i;const e=employees[i],h=e.hr||{};
-  document.getElementById('hrModalTitle').textContent='HR & payroll — '+(e.name||'');
-  document.getElementById('h_basic').value=e.currentSalary?fmtM(e.currentSalary):'Not set';
-  HR_NUM.forEach(k=>document.getElementById('h_'+k).value=h[k]||'');
-  if(h.gosiErPct===undefined)document.getElementById('h_gosiErPct').value=2;
-  HR_TXT.forEach(k=>document.getElementById('h_'+k).value=h[k]||'');
+  hrIdx=i;const w=i===null?{}:wareef[i];
+  document.getElementById('hrModalTitle').textContent=i===null?'Add Wareef employee':'Edit — '+(w.name||'');
+  document.getElementById('hrSaveBtn').textContent=i===null?'Save employee':'Update employee';
+  W_NUM.forEach(k=>document.getElementById('h_'+k).value=w[k]||'');
+  W_TXT.forEach(k=>document.getElementById('h_'+k).value=w[k]||'');
+  if(!w.nationality)document.getElementById('h_nationality').value='Non-Saudi';
+  if(i===null)natChanged();
   updateHRCalc();
   document.getElementById('hrModal').classList.add('open');
 }
 function closeHR(){document.getElementById('hrModal').classList.remove('open');hrIdx=null}
 async function saveHR(){
-  if(hrIdx===null)return;
-  const btn=document.getElementById('hrSaveBtn');btn.textContent='Saving…';btn.disabled=true;
+  const w=readHRForm();
+  if(!w.name||!w.empId){showToast('Name and Employee ID are required.',true);return}
+  const btn=document.getElementById('hrSaveBtn'),editing=hrIdx!==null;btn.disabled=true;btn.textContent='Saving…';
   try{
-    const res=await fetch(`/api/employees/${employees[hrIdx]._id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({hr:readHRForm()})});
+    const res=editing
+      ?await fetch(`/api/wareef/${wareef[hrIdx]._id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(w)})
+      :await fetch('/api/wareef',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(w)});
     if(!res.ok)throw new Error();
-    showToast('HR details saved ✓');closeHR();await loadData();
+    showToast(editing?'Employee updated ✓':'Employee added ✓');closeHR();await loadWareef();
   }catch(e){showToast('Save failed',true)}
-  finally{btn.textContent='Save HR details';btn.disabled=false}
+  finally{btn.disabled=false;btn.textContent=editing?'Update employee':'Save employee'}
+}
+async function deleteWareef(i){
+  if(!confirm(`Delete ${wareef[i].name}?`))return;
+  try{const res=await fetch(`/api/wareef/${wareef[i]._id}`,{method:'DELETE'});if(!res.ok)throw new Error();showToast('Employee deleted');await loadWareef();}
+  catch(e){showToast('Delete failed',true)}
+}
+function openWareefReport(i){
+  const w=wareef[i],c=hrCalc(w),tenure=yearsFrom(w.joiningDate),ids=idStatus(w),is=insStatus(w);
+  const f=(l,v)=>`<div class="report-field"><div class="rf-lbl">${l}</div><div class="rf-val">${v}</div></div>`;
+  document.getElementById('reportContent').innerHTML=`
+    <div id="reportPrintArea">
+      <div class="report-header"><h1>Wareef Employee Report — ${esc(w.name)}</h1><p>Generated on ${new Date().toLocaleDateString()} &middot; Employee ID: ${esc(w.empId||'—')}</p></div>
+      <div class="report-section"><h3>Personal &amp; Job</h3><div class="report-grid">
+        ${f('Full name',esc(w.name))}${f('Employee ID',esc(w.empId||'—'))}
+        ${f('Nationality',esc(w.nationality||'—'))}${f('Job title / department',esc(w.jobTitle||'—')+(w.department?' · '+esc(w.department):''))}
+        ${f('Phone',esc(w.phone||'—'))}${f('Iqama / ID number',esc(w.idNumber||'—'))}
+        ${f('ID expiry',dFmt(w.idExpiry)+' ('+ids.label+')')}${f('Joining date',dFmt(w.joiningDate)+(tenure?' — '+tenure+' years':''))}
+      </div></div>
+      <div class="report-section"><h3>Salary &amp; Deductions (monthly)</h3><table class="report-table"><tbody>
+        <tr><td>Basic salary</td><td class="num">${fmtM(c.basic)}</td></tr>
+        <tr><td>Housing allowance</td><td class="num">${fmtM(c.housing)}</td></tr>
+        <tr><td>Transport allowance</td><td class="num">${fmtM(c.transport)}</td></tr>
+        <tr><td>Other allowances</td><td class="num">${fmtM(c.otherAllow)}</td></tr>
+        <tr><td><b>Gross salary</b></td><td class="num"><b>${fmtM(c.gross)}</b></td></tr>
+        <tr><td>GOSI employee share (${num(w.gosiEmpPct)}%)</td><td class="num">− ${fmtM(c.gosiEmp)}</td></tr>
+        <tr><td>Loan / advance</td><td class="num">− ${fmtM(c.loan)}</td></tr>
+        <tr><td>Other deductions${w.otherDedNote?' — '+esc(w.otherDedNote):''}</td><td class="num">− ${fmtM(c.otherDed)}</td></tr>
+        <tr><td><b>Net pay</b></td><td class="num"><b>${fmtM(c.net)}</b></td></tr>
+      </tbody></table></div>
+      <div class="report-section"><h3>Employer Costs</h3><div class="report-grid">
+        ${f('GOSI employer share ('+num(w.gosiErPct)+'%) / month',fmtM(c.gosiEr))}
+        ${f('Medical insurance',esc(w.insProvider||'—')+(w.insClass?' · Class '+esc(w.insClass):'')+(w.insPolicy?' · '+esc(w.insPolicy):'')+' ('+is.label+(w.insExpiry?', exp. '+dFmt(w.insExpiry):'')+')')}
+        ${f('Insurance premium / year',fmtM(w.medicalIns))}${f('Iqama renewal fee / year',fmtM(w.iqamaFee))}
+        ${f('Work permit fee / year',fmtM(w.workPermitFee))}${f('Other fees / year',fmtM(w.otherFees))}
+        ${f('Cost to company / month',fmtM(c.costMonthly))}${f('Cost to company / year',fmtM(c.costMonthly*12))}
+      </div></div>
+      <div class="report-section"><h3>Bank</h3><div class="report-grid">${f('Bank name',esc(w.bankName||'—'))}${f('IBAN',esc(w.iban||'—'))}</div></div>
+    </div>`;
+  document.getElementById('reportModal').classList.add('open');
 }
 document.getElementById('hrModal').addEventListener('input',updateHRCalc);
 document.getElementById('hrModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeHR()});
 try{if(localStorage.getItem('et_tab')==='hr')switchTab('hr')}catch(e){}
+loadWareef();
 
 function closeDetail(){document.getElementById('detailModal').classList.remove('open')}
 document.getElementById('formModal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeModal()});
@@ -1039,9 +1114,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', len(body))
             self.end_headers()
             self.wfile.write(body)
-        elif path == '/api/employees':
+        elif api_collection(path)[0] is not None and api_collection(path)[1] is None:
             try:
-                self.send_json(load_employees())
+                self.send_json(load_employees(api_collection(path)[0]))
             except Exception as ex:
                 self.send_json({'error': str(ex)}, 500)
         else:
@@ -1049,35 +1124,32 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self):
-        if self.path == '/api/employees':
+        col, doc_id = api_collection(urlparse(self.path).path)
+        if col is not None and doc_id is None:
             length = int(self.headers.get('Content-Length', 0))
             emp = json.loads(self.rfile.read(length))
             try:
-                add_employee(emp)
+                add_employee(emp, col)
                 self.send_json({'status': 'ok'})
             except Exception as ex:
                 self.send_json({'error': str(ex)}, 500)
 
     def do_PUT(self):
-        path = urlparse(self.path).path
-        parts = path.split('/')
-        if len(parts) == 4 and parts[2] == 'employees':
-            doc_id = parts[3]
+        col, doc_id = api_collection(urlparse(self.path).path)
+        if col is not None and doc_id:
             length = int(self.headers.get('Content-Length', 0))
             emp = json.loads(self.rfile.read(length))
             try:
-                update_employee(doc_id, emp)
+                update_employee(doc_id, emp, col)
                 self.send_json({'status': 'ok'})
             except Exception as ex:
                 self.send_json({'error': str(ex)}, 500)
 
     def do_DELETE(self):
-        path = urlparse(self.path).path
-        parts = path.split('/')
-        if len(parts) == 4 and parts[2] == 'employees':
-            doc_id = parts[3]
+        col, doc_id = api_collection(urlparse(self.path).path)
+        if col is not None and doc_id:
             try:
-                delete_employee(doc_id)
+                delete_employee(doc_id, col)
                 self.send_json({'status': 'ok'})
             except Exception as ex:
                 self.send_json({'error': str(ex)}, 500)
